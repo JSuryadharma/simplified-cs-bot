@@ -1,4 +1,4 @@
-# Admin WhatsApp berbasis n8n + LM Studio
+# Admin WhatsApp berbasis n8n + OpenRouter
 
 Proyek ini menyediakan chatbot admin WhatsApp berbahasa Indonesia yang dapat:
 
@@ -28,8 +28,8 @@ Aplikasi utama SaViOr berjalan dari compose-nya sendiri (`../GitHub/savior-app`)
 `savior-web` (http://localhost:3500) dan `savior-postgres` (port 5433). Stack ini hanya
 pendukung dan tidak menjalankan aplikasi SaViOr.
 
-LM Studio tetap berjalan di host dan diakses lewat `host.docker.internal:1234`
-(Docker di macOS tidak bisa memakai GPU Apple, jadi model lokal tidak dimasukkan ke container).
+Semua model AI (chat dan embedding) dipakai lewat OpenRouter (`OPENROUTER_*` di `.env`);
+tidak ada model lokal yang perlu dijalankan.
 Setup lama (n8n terpisah + `compose.yaml` pendukung) disimpan di `legacy/`.
 
 ## Deploy ke mesin baru
@@ -64,12 +64,12 @@ lalu pulihkan hasil `make backup` (`postgres-all.sql.gz` ke `savior-postgres` se
 flowchart LR
     WA[WhatsApp / simulator] --> N8N[n8n webhook]
     N8N --> DB[(PostgreSQL)]
-    N8N --> EMB[LM Studio embeddings]
+    N8N --> EMB[OpenRouter embeddings]
     EMB --> Q[(Qdrant)]
     FORM[Form upload admin] --> N8N
     N8N --> ASSET[(Volume aset n8n)]
     N8N -->|metadata + embedding| Q
-    Q --> LLM[LM Studio chat model]
+    Q --> LLM[OpenRouter chat model]
     DB --> LLM
     LLM -->|knowledge/order cukup| AUTO[Balas pelanggan]
     LLM -->|tidak cukup| ESC[Eskalasi ke owner]
@@ -85,7 +85,7 @@ atau knowledge/order tidak mendukung jawaban, sistem memilih eskalasi.
 
 ## Mulai cepat
 
-Prasyarat: Docker Desktop, Node.js 20+, dan LM Studio.
+Prasyarat: Docker Desktop, Node.js 20+, dan API key OpenRouter.
 
 1. Buat konfigurasi lokal:
 
@@ -96,12 +96,14 @@ Prasyarat: Docker Desktop, Node.js 20+, dan LM Studio.
    Ganti semua nilai `ganti_...`, isi `OWNER_PHONE`, dan pilih ID model yang benar.
    Jangan commit `.env`.
 
-2. Di LM Studio, muat satu chat model yang mendukung structured output dan satu
-   embedding model. Nyalakan Local Server pada port `1234` serta **Serve on Local
-   Network**, karena n8n berjalan di Docker. Model contoh pada `.env.example`:
+2. Isi `OPENROUTER_API_KEY` (https://openrouter.ai/keys). Model bawaan pada `.env.example`:
 
-   - chat: `openai/gpt-oss-20b`;
-   - embedding: `text-embedding-nomic-embed-text-v1.5`.
+   - chat: `nvidia/nemotron-3-super-120b-a12b` (`OPENROUTER_MODEL`);
+   - embedding: `openai/text-embedding-3-small` (`OPENROUTER_EMBEDDING_MODEL`).
+
+   Mengganti model embedding mengubah dimensi vector, jadi buat collection baru dengan
+   `node scripts/reembed-knowledge.mjs <collection_lama> <collection_baru>` lalu ubah
+   `QDRANT_COLLECTION` (dan cek ulang `QDRANT_SCORE_THRESHOLD`).
 
 3. Jalankan database SaViOr lebih dulu, siapkan skema bot, lalu jalankan stack:
 
@@ -119,7 +121,7 @@ Prasyarat: Docker Desktop, Node.js 20+, dan LM Studio.
 Perintah lain: `make ps`, `make logs`, `make restart`, `make down`.
 
 Dashboard Qdrant tersedia secara lokal di `http://localhost:6333/dashboard`.
-Collection yang dipakai workflow adalah `wa_knowledge`.
+Collection yang dipakai workflow adalah `QDRANT_COLLECTION` (saat ini `wa_knowledge_openrouter`, embedding OpenRouter; `wa_knowledge` lama berisi embedding LM Studio dan tidak dipakai lagi).
 
 ## Uji lokal tanpa Meta
 
@@ -263,7 +265,7 @@ Kontrak order, operasi tiket, tuning threshold, dan checklist privasi ada di
 
 Dokumentasi rujukan:
 
-- [LM Studio OpenAI-compatible API](https://lmstudio.ai/docs/developer/openai-compat)
+- [OpenRouter API](https://openrouter.ai/docs)
 - [n8n Docker](https://docs.n8n.io/hosting/installation/docker/)
 - [n8n SSRF protection](https://docs.n8n.io/hosting/securing/ssrf-protection/)
 - [WhatsApp Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api/)

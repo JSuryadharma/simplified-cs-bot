@@ -8,7 +8,7 @@ set -eu
 
 cd "$(dirname "$0")/.."
 COLLECTION="$(grep -E '^QDRANT_COLLECTION=' .env | cut -d= -f2- || true)"
-COLLECTION="${COLLECTION:-wa_knowledge}"
+COLLECTION="${COLLECTION:-wa_knowledge_openrouter}"
 OUT="backups/stack_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$OUT"
 

@@ -6,10 +6,10 @@
 //            Embedding dibuat lebih dulu; penghapusan baru dilakukan setelah semua embedding berhasil.
 // --db       sinkronkan ke Postgres lewat RPC bot_api.import_knowledge (perlu db/006-knowledge-import.sql).
 // --dry-run  hanya bangun dokumen dan tampilkan ringkasan.
-// Qdrant, LM Studio, dan db-api diakses dari host (localhost).
+// Qdrant dan db-api diakses dari host (localhost); embedding lewat OpenRouter.
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadEnv, projectRoot } from './lib.mjs';
+import { embedTexts, loadEnv, projectRoot } from './lib.mjs';
 import { buildKnowledgeDocs, sha1Hex } from './knowledge/index.mjs';
 
 loadEnv();
@@ -18,8 +18,6 @@ const flag = (name) => args.includes(`--${name}`);
 const values = (name) => args.flatMap((a, i) => (a === `--${name}` && args[i + 1] ? [args[i + 1]] : []));
 
 const QDRANT = process.env.QDRANT_HOST_URL || 'http://localhost:6333';
-const LM = (process.env.LM_STUDIO_HOST_URL || 'http://localhost:1234/v1').replace(/\/$/, '');
-const MODEL = process.env.LM_STUDIO_EMBEDDING_MODEL || 'text-embedding-nomic-embed-text-v1.5';
 const DB_API = process.env.DB_API_HOST_URL || 'http://localhost:3002';
 const collection = values('collection')[0] || process.env.QDRANT_COLLECTION || 'wa_knowledge';
 const storage = path.join(projectRoot, 'n8n_data/storage');
@@ -47,14 +45,8 @@ const byType = docs.reduce((acc, d) => ({ ...acc, [d.payload.content_type]: (acc
 process.stdout.write(`${docs.length} dokumen (${JSON.stringify(byType)}), dilewati ${skipped.length}${skipped.length ? ': ' + JSON.stringify(skipped) : ''}\n`);
 if (flag('dry-run')) process.exit(0);
 
-// 1. Embedding dulu (batch 32). Gagal di sini = data lama tetap utuh.
-const vectors = [];
-for (let i = 0; i < docs.length; i += 32) {
-  const batch = docs.slice(i, i + 32);
-  const emb = await call(`${LM}/embeddings`, 'POST', { model: MODEL, input: batch.map((d) => `search_document: ${d.text}`) });
-  if (!Array.isArray(emb.data) || emb.data.length !== batch.length) throw new Error('jumlah embedding tidak sesuai');
-  vectors.push(...emb.data.map((e) => e.embedding));
-}
+// 1. Embedding dulu (OpenRouter, batch 32). Gagal di sini = data lama tetap utuh.
+const vectors = await embedTexts(docs.map((d) => d.text), { batchSize: 32 });
 
 // 2. Pastikan collection ada (dimensi dari embedding)
 const exists = await fetch(`${QDRANT}/collections/${collection}`);

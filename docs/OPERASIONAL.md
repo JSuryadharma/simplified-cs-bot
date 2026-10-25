@@ -64,7 +64,7 @@ Qdrant dapat diperiksa dari host melalui:
 http://localhost:6333/dashboard
 ```
 
-Collection `wa_knowledge` memuat dua tipe payload:
+Collection knowledge (`QDRANT_COLLECTION`) memuat dua tipe payload:
 
 - `chat_qa`: pertanyaan dan jawaban dari histori chat atau balasan owner;
 - `image_asset`: deskripsi, tag, MIME type, `asset_id`, dan path file referensi.
@@ -97,7 +97,7 @@ terlalu umum karena dapat menurunkan akurasi pemilihan aset.
 ## Monitoring minimum
 
 - Pantau execution error alur 02, 03, dan 05.
-- Alert bila LM Studio, Qdrant, atau PostgreSQL tidak sehat.
+- Alert bila OpenRouter, Qdrant, atau PostgreSQL tidak sehat (`make doctor`).
 - Pantau tiket `waiting_owner` yang terlalu lama:
 
   ```bash

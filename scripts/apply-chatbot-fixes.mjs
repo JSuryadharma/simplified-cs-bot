@@ -16,7 +16,7 @@ const raw = JSON.parse(fs.readFileSync(input, 'utf8'));
 const workflow = Array.isArray(raw) ? raw[0] : raw;
 const byName = (name) => workflow.nodes.find((n) => n.name === name);
 const must = (name) => { const n = byName(name); if (!n) throw new Error(`node "${name}" tidak ditemukan`); return n; };
-const lmHeaders = { parameters: [{ name: 'Authorization', value: '=Bearer {{$env.LM_STUDIO_API_TOKEN}}' }] };
+const lmHeaders = { parameters: [{ name: 'Authorization', value: '=Bearer {{$env.OPENROUTER_API_KEY}}' }] };
 
 // ---------------------------------------------------------------- 1. OpenRouter
 const llm = must('LLM Ambil Keputusan');
@@ -29,11 +29,11 @@ Object.assign(llm, { retryOnFail: true, maxTries: 3, waitBetweenTries: 5000, onE
 
 // ---------------------------------------------------------------- 2. Pencarian knowledge
 must('Embedding Pertanyaan').parameters.jsonBody =
-  "={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: ['search_query: ' + (($json.recent_messages || []).filter((m) => m.sender === 'customer').slice(-2).map((m) => m.text).join('\\n') || $json.message_text)] }) }}";
+  "={{ JSON.stringify({ model: $env.OPENROUTER_EMBEDDING_MODEL, input: ['search_query: ' + (($json.recent_messages || []).filter((m) => m.sender === 'customer').slice(-2).map((m) => m.text).join('\\n') || $json.message_text)] }) }}";
 must('Embedding Knowledge Impor').parameters.jsonBody =
-  "={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: $json.qa_pairs.map((p) => 'search_document: Pertanyaan: ' + p.question + '\\nJawaban: ' + p.answer) }) }}";
+  "={{ JSON.stringify({ model: $env.OPENROUTER_EMBEDDING_MODEL, input: $json.qa_pairs.map((p) => 'search_document: Pertanyaan: ' + p.question + '\\nJawaban: ' + p.answer) }) }}";
 must('Embedding Deskripsi Aset').parameters.jsonBody =
-  "={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: ['search_document: ' + $json.embedding_text] }) }}";
+  "={{ JSON.stringify({ model: $env.OPENROUTER_EMBEDDING_MODEL, input: ['search_document: ' + $json.embedding_text] }) }}";
 
 // ---------------------------------------------------------------- 3. Prompt + penjaga balasan
 const prep = must('Siapkan Keputusan AI');
@@ -131,7 +131,7 @@ if (!byName('Dari Owner?')) {
     send('Teruskan Jawaban Owner', '={{$json.customer_phone}}', '={{$json.owner_answer}}', at(1344, 640)),
     http('Selesaikan Tiket', 'POST', '={{$env.DB_API_URL + "/rpc/complete_owner_reply"}}', "={{ JSON.stringify({ p_ticket_id: $('Hasil Owner').first().json.ticket_id, p_provider_message_id: $json.messages?.[0]?.id || null }) }}", at(1568, 640)),
     code('Hasil Tiket Selesai', unwrap, at(1792, 640)),
-    http('Embedding Jawaban Owner', 'POST', '={{$env.LM_STUDIO_BASE_URL + "/embeddings"}}', "={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: ['search_document: Pertanyaan: ' + $json.question + '\\nJawaban: ' + $json.answer] }) }}", at(2016, 640), lmHeaders),
+    http('Embedding Jawaban Owner', 'POST', '={{$env.OPENROUTER_BASE_URL + "/embeddings"}}', "={{ JSON.stringify({ model: $env.OPENROUTER_EMBEDDING_MODEL, input: ['search_document: Pertanyaan: ' + $json.question + '\\nJawaban: ' + $json.answer] }) }}", at(2016, 640), lmHeaders),
     code('Point Jawaban Owner', "const done = $('Hasil Tiket Selesai').first().json;\nconst vector = $json.data?.[0]?.embedding;\nif (!Array.isArray(vector)) throw new Error('Embedding jawaban owner gagal dibuat.');\nreturn [{ json: { points: [{ id: done.ticket_id, vector, payload: { content_type: 'chat_qa', question: done.question, answer: done.answer, text: 'Pertanyaan: ' + done.question + '\\nJawaban: ' + done.answer, source: done.source, ticket_code: done.ticket_code, updated_at: new Date().toISOString() } }] } }];", at(2240, 640)),
     http('Upsert Knowledge Owner', 'PUT', '={{$env.QDRANT_URL + "/collections/" + $env.QDRANT_COLLECTION + "/points?wait=true"}}', '={{ JSON.stringify($json) }}', at(2464, 640)),
     ifNode('Perintah Pesanan?', [eq('={{$json.action}}', 'summarize_orders')], at(1344, 880)),

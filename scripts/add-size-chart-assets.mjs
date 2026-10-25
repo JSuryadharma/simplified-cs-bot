@@ -3,12 +3,10 @@
 // juga bisa dijawab. File gambar sudah ada di n8n_data/storage (dipasang di /home/node/.n8n/storage).
 //   node scripts/add-size-chart-assets.mjs [collection]   (default: QDRANT_COLLECTION / wa_knowledge)
 // Idempoten: id point tetap, menjalankan ulang hanya menimpa.
-import { loadEnv } from './lib.mjs';
+import { embedTexts, loadEnv } from './lib.mjs';
 
 loadEnv();
 const QDRANT = process.env.QDRANT_HOST_URL || 'http://localhost:6333';
-const LM = (process.env.LM_STUDIO_HOST_URL || 'http://localhost:1234/v1').replace(/\/$/, '');
-const MODEL = process.env.LM_STUDIO_EMBEDDING_MODEL || 'text-embedding-nomic-embed-text-v1.5';
 const collection = process.argv[2] || process.env.QDRANT_COLLECTION || 'wa_knowledge';
 const STORAGE = '/home/node/.n8n/storage/';
 
@@ -62,7 +60,7 @@ for (const c of charts) {
   } });
 }
 
-const emb = await call(`${LM}/embeddings`, 'POST', { model: MODEL, input: docs.map((d) => `search_document: ${d.text}`) });
-const points = docs.map((d, i) => ({ id: d.id, vector: emb.data[i].embedding, payload: { ...d.payload, imported_at: new Date().toISOString() } }));
+const vectors = await embedTexts(docs.map((d) => d.text));
+const points = docs.map((d, i) => ({ id: d.id, vector: vectors[i], payload: { ...d.payload, imported_at: new Date().toISOString() } }));
 await call(`${QDRANT}/collections/${collection}/points?wait=true`, 'PUT', { points });
 process.stdout.write(`${points.length} point size chart ditulis ke ${collection}\n`);

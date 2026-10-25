@@ -301,7 +301,7 @@ return [{ json: {
   knowledge,
   matchStrength,
   requestBody: {
-    model: ${liveModel ? `'${liveModel[1]}'` : "$env.LM_STUDIO_CHAT_MODEL"},
+    model: ${liveModel ? `'${liveModel[1]}'` : "$env.OPENROUTER_MODEL"},
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: JSON.stringify(payload) }

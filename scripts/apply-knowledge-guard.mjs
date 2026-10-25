@@ -46,7 +46,7 @@ prep.parameters.jsCode = prep.parameters.jsCode.replace(/max_tokens: 700,/, 'max
 // Pencarian: pesan terakhir saja + gabungan 2 pesan terakhir, digabung dengan RRF. Pertanyaan baru tidak
 // tenggelam oleh topik pesan sebelumnya, dan "ada contoh gambarnya?" tetap mendapat konteks.
 must('Embedding Pertanyaan').parameters.jsonBody =
-  "={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: ['search_query: ' + $json.message_text, 'search_query: ' + (($json.recent_messages || []).filter((m) => m.sender === 'customer').slice(-2).map((m) => m.text).join('\\n') || $json.message_text)] }) }}";
+  "={{ JSON.stringify({ model: $env.OPENROUTER_EMBEDDING_MODEL, input: ['search_query: ' + $json.message_text, 'search_query: ' + (($json.recent_messages || []).filter((m) => m.sender === 'customer').slice(-2).map((m) => m.text).join('\\n') || $json.message_text)] }) }}";
 must('Cari Knowledge Qdrant').parameters.jsonBody =
   "={{ JSON.stringify({ prefetch: ($json.data || []).map((d) => ({ query: d.embedding, limit: 10, score_threshold: Number($env.QDRANT_SCORE_THRESHOLD || 0.72) })), query: { fusion: 'rrf' }, limit: 12, with_payload: true }) }}";
 

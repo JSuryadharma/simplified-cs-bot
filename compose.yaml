@@ -12,7 +12,7 @@
 #   make up                # jalankan semua service, tunggu sampai healthy
 #   make backup            # backup database bot + Qdrant + n8n_data ke backups/
 #
-# LM Studio tetap berjalan di host (host.docker.internal:1234).
+# Model AI (chat + embedding) dipakai lewat OpenRouter; tidak ada model lokal.
 
 name: savior-whatsapp-stack
 
@@ -41,14 +41,13 @@ x-n8n-env: &n8n-env
   # Dibaca workflow lewat $env.*
   DB_API_URL: http://db-api:3000
   QDRANT_URL: http://qdrant:6333
-  QDRANT_COLLECTION: ${QDRANT_COLLECTION:-wa_knowledge}
-  QDRANT_SCORE_THRESHOLD: ${QDRANT_SCORE_THRESHOLD:-0.6}
-  LM_STUDIO_BASE_URL: ${LM_STUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
-  LM_STUDIO_API_TOKEN: ${LM_STUDIO_API_TOKEN:-lm-studio}
-  LM_STUDIO_CHAT_MODEL: ${LM_STUDIO_CHAT_MODEL:-qwen/qwen3.5-9b}
-  LM_STUDIO_EMBEDDING_MODEL: ${LM_STUDIO_EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}
-  OPENROUTER_MODEL: ${OPENROUTER_MODEL:-nvidia/nemotron-3-super-120b-a12b:free}
-  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+  QDRANT_COLLECTION: ${QDRANT_COLLECTION:-wa_knowledge_openrouter}
+  QDRANT_SCORE_THRESHOLD: ${QDRANT_SCORE_THRESHOLD:-0.55}
+  # Semua model (chat + embedding) lewat OpenRouter
+  OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?isi OPENROUTER_API_KEY di .env}
+  OPENROUTER_MODEL: ${OPENROUTER_MODEL:-nvidia/nemotron-3-super-120b-a12b}
+  OPENROUTER_EMBEDDING_MODEL: ${OPENROUTER_EMBEDDING_MODEL:-openai/text-embedding-3-small}
   WHATSAPP_API_BASE_URL: http://mock-whatsapp:8080
   WHATSAPP_GRAPH_VERSION: ${WHATSAPP_GRAPH_VERSION:-v23.0}
   WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
@@ -120,9 +119,9 @@ services:
       PORT: "4000"
       TZ: ${GENERIC_TIMEZONE:-Asia/Jakarta}
       DB_API_URL: http://db-api:3000
-      LM_STUDIO_BASE_URL: ${LM_STUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
-      LM_STUDIO_API_TOKEN: ${LM_STUDIO_API_TOKEN:-lm-studio}
-      LM_STUDIO_CHAT_MODEL: ${LM_STUDIO_CHAT_MODEL:-qwen/qwen3.5-9b}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-nvidia/nemotron-3-super-120b-a12b}
       OWNER_PHONE: ${OWNER_PHONE:-}
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
@@ -134,10 +133,10 @@ services:
       N8N_IMPORT_WEBHOOK_URL: http://n8n:5678/webhook/admin/import-knowledge
       IMPORT_API_KEY: ${IMPORT_API_KEY:-}
       QDRANT_URL: http://qdrant:6333
-      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-wa_knowledge}
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-wa_knowledge_openrouter}
       STORAGE_DIR: /storage
-      LM_STUDIO_EMBEDDING_MODEL: ${LM_STUDIO_EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}
-      QDRANT_SCORE_THRESHOLD: ${QDRANT_SCORE_THRESHOLD:-0.6}
+      OPENROUTER_EMBEDDING_MODEL: ${OPENROUTER_EMBEDDING_MODEL:-openai/text-embedding-3-small}
+      QDRANT_SCORE_THRESHOLD: ${QDRANT_SCORE_THRESHOLD:-0.55}
     extra_hosts: ["host.docker.internal:host-gateway"]
     ports:
       - "4000:4000"

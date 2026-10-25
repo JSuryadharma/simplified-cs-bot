@@ -191,8 +191,8 @@ workflow.nodes.push(
   code(9, 'Gabungkan Knowledge Impor', GABUNG, at(6)),
   ifNode(10, 'Ada Dokumen Knowledge?', '={{ String($json.has_docs === true) }}', at(7)),
   respond(11, 'Impor Knowledge Kosong', '={{ { ok: false, error: "Tidak ada knowledge yang bisa diimpor", ...$json.summary } }}', 422, at(8, 1)),
-  http(12, 'Embedding Knowledge v2', 'POST', '={{$env.LM_STUDIO_BASE_URL + "/embeddings"}}', '={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: $json.texts }) }}', at(8), {
-    parameters: { sendHeaders: true, headerParameters: { parameters: [{ name: 'Authorization', value: '=Bearer {{$env.LM_STUDIO_API_TOKEN}}' }] }, options: { timeout: 120000 } } }),
+  http(12, 'Embedding Knowledge v2', 'POST', '={{$env.OPENROUTER_BASE_URL + "/embeddings"}}', '={{ JSON.stringify({ model: $env.OPENROUTER_EMBEDDING_MODEL, input: $json.texts }) }}', at(8), {
+    parameters: { sendHeaders: true, headerParameters: { parameters: [{ name: 'Authorization', value: '=Bearer {{$env.OPENROUTER_API_KEY}}' }] }, options: { timeout: 120000 } } }),
   code(13, 'Buat Points Knowledge', POINTS, at(9)),
   ifNode(14, 'Ganti Semua Knowledge?', '={{ String($json.replace === true) }}', at(10)),
   http(15, 'Hapus Knowledge Lama', 'POST', qdrant('/points/delete?wait=true'), '={{ JSON.stringify({ filter: {} }) }}', at(11, -1)),

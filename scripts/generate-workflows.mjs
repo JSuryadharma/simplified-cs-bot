@@ -170,7 +170,7 @@ const value = Array.isArray(raw) ? (raw[0] ?? {}) : raw;
 return [{ json: value?.result && Object.keys(value).length === 1 ? value.result : value }];`;
 
 const lmHeaders = [
-  { name: 'Authorization', value: '=Bearer {{$env.LM_STUDIO_API_TOKEN}}' },
+  { name: 'Authorization', value: '=Bearer {{$env.OPENROUTER_API_KEY}}' },
 ];
 
 const waCredential = {
@@ -193,9 +193,9 @@ function lmChatModel(name, position) {
     1.2,
     position,
     {
-      model: { __rl: true, mode: 'id', value: '={{$env.LM_STUDIO_CHAT_MODEL}}' },
+      model: { __rl: true, mode: 'id', value: '={{$env.OPENROUTER_MODEL}}' },
       options: {
-        baseURL: '={{$env.LM_STUDIO_BASE_URL}}',
+        baseURL: '={{$env.OPENROUTER_BASE_URL}}',
         temperature: 0.25,
       },
     },
@@ -272,8 +272,8 @@ function waSendImage(name, position, toExpression, captionExpression) {
       'Tes Embedding',
       [680, 100],
       'POST',
-      '={{$env.LM_STUDIO_BASE_URL + "/embeddings"}}',
-      `={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: ['inisialisasi basis pengetahuan WhatsApp'] }) }}`,
+      '={{$env.OPENROUTER_BASE_URL + "/embeddings"}}',
+      `={{ JSON.stringify({ model: $env.OPENROUTER_EMBEDDING_MODEL, input: ['inisialisasi basis pengetahuan WhatsApp'] }) }}`,
       lmHeaders,
     ),
     code('Baca Dimensi', [900, 100], `const vector = $json.data?.[0]?.embedding;
@@ -463,7 +463,7 @@ return [{ json: {
   context: ctx,
   knowledge,
   requestBody: {
-    model: $env.LM_STUDIO_CHAT_MODEL,
+    model: $env.OPENROUTER_MODEL,
     temperature: 0.25,
     max_tokens: 700,
     messages: [
@@ -529,7 +529,7 @@ return [{ json: {
 
   const prepareOrderSummary = `const data = $input.first().json;
 const requestBody = {
-  model: $env.LM_STUDIO_CHAT_MODEL,
+  model: $env.OPENROUTER_MODEL,
   temperature: 0.2,
   max_tokens: 700,
   messages: [
@@ -557,8 +557,8 @@ return [{ json: { text: content || 'Belum ada data order untuk filter tersebut.'
     http('Selesaikan Tiket', [1840, -380], 'POST', '={{$env.DB_API_URL + "/rpc/complete_owner_reply"}}',
       `={{ JSON.stringify({ p_ticket_id: $('Hasil Owner').first().json.ticket_id, p_provider_message_id: $json.messages?.[0]?.id || null }) }}`),
     code('Hasil Tiket Selesai', [2060, -380], normalizeRpcCode),
-    http('Embedding Jawaban Owner', [2280, -380], 'POST', '={{$env.LM_STUDIO_BASE_URL + "/embeddings"}}',
-      `={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: ['Pertanyaan: ' + $json.question + '\\nJawaban: ' + $json.answer] }) }}`, lmHeaders),
+    http('Embedding Jawaban Owner', [2280, -380], 'POST', '={{$env.OPENROUTER_BASE_URL + "/embeddings"}}',
+      `={{ JSON.stringify({ model: $env.OPENROUTER_EMBEDDING_MODEL, input: ['Pertanyaan: ' + $json.question + '\\nJawaban: ' + $json.answer] }) }}`, lmHeaders),
     code('Point Jawaban Owner', [2500, -380], `const done = $('Hasil Tiket Selesai').first().json;
 const vector = $json.data?.[0]?.embedding;
 if (!Array.isArray(vector)) throw new Error('Embedding jawaban owner gagal dibuat.');
@@ -568,7 +568,7 @@ return [{ json: { points: [{ id: done.ticket_id, vector, payload: { content_type
 
     ifString('Perintah Pesanan?', [1600, -60], '={{$json.action}}', 'summarize_orders'),
     code('Siapkan Ringkasan Order', [1840, -120], prepareOrderSummary),
-    http('LLM Ringkas Order', [2060, -120], 'POST', '={{$env.LM_STUDIO_BASE_URL + "/chat/completions"}}',
+    http('LLM Ringkas Order', [2060, -120], 'POST', '={{$env.OPENROUTER_BASE_URL + "/chat/completions"}}',
       '={{ JSON.stringify($json.requestBody) }}', lmHeaders),
     code('Hasil Ringkasan Order', [2280, -120], parseOrderSummary),
     waSend('Kirim Ringkasan ke Owner', [2500, -120], '$env.OWNER_PHONE', '$json.text'),
@@ -581,13 +581,13 @@ return [{ json: { points: [{ id: done.ticket_id, vector, payload: { content_type
     code('Hasil Customer', [1140, 420], normalizeRpcCode),
     ifString('Perlu Klasifikasi?', [1360, 420], '={{$json.action}}', 'classify'),
     noOp('Diam Menunggu Owner', [1600, 620]),
-    http('Embedding Pertanyaan', [1600, 360], 'POST', '={{$env.LM_STUDIO_BASE_URL + "/embeddings"}}',
-      `={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: [$json.message_text] }) }}`, lmHeaders),
+    http('Embedding Pertanyaan', [1600, 360], 'POST', '={{$env.OPENROUTER_BASE_URL + "/embeddings"}}',
+      `={{ JSON.stringify({ model: $env.OPENROUTER_EMBEDDING_MODEL, input: [$json.message_text] }) }}`, lmHeaders),
     http('Cari Knowledge Qdrant', [1840, 360], 'POST', '={{$env.QDRANT_URL + "/collections/" + $env.QDRANT_COLLECTION + "/points/query"}}',
       `={{ JSON.stringify({ query: $json.data?.[0]?.embedding, limit: 8, score_threshold: Number($env.QDRANT_SCORE_THRESHOLD || 0.72), with_payload: true }) }}`,
       [], { response: { response: { neverError: true, responseFormat: 'json' } } }),
     code('Siapkan Keputusan AI', [2060, 360], prepareDecision),
-    http('LLM Ambil Keputusan', [2280, 360], 'POST', '={{$env.LM_STUDIO_BASE_URL + "/chat/completions"}}',
+    http('LLM Ambil Keputusan', [2280, 360], 'POST', '={{$env.OPENROUTER_BASE_URL + "/chat/completions"}}',
       '={{ JSON.stringify($json.requestBody) }}', lmHeaders),
     code('Parse Keputusan AI', [2500, 360], parseDecision),
     http('Simpan Keputusan', [2720, 360], 'POST', '={{$env.DB_API_URL + "/rpc/apply_decision"}}',
@@ -763,7 +763,7 @@ Tugas:
 return [{ json: {
   stats: data,
   requestBody: {
-    model: $env.LM_STUDIO_CHAT_MODEL,
+    model: $env.OPENROUTER_MODEL,
     temperature: 0.15,
     max_tokens: 5000,
     messages: [
@@ -851,15 +851,15 @@ return [{ json: {
     respond('Tolak Impor', [680, 180], 'json', '={{ { error: "unauthorized" } }}', 401),
     code('Parse Ekspor WhatsApp', [680, -80], parseExport),
     code('Siapkan Analisis Style', [900, -80], prepareStyle),
-    http('LLM Analisis Chat', [1120, -80], 'POST', '={{$env.LM_STUDIO_BASE_URL + "/chat/completions"}}',
+    http('LLM Analisis Chat', [1120, -80], 'POST', '={{$env.OPENROUTER_BASE_URL + "/chat/completions"}}',
       '={{ JSON.stringify($json.requestBody) }}', lmHeaders),
     code('Parse Analisis Style', [1340, -80], parseStyle),
     http('Simpan Style dan Knowledge', [1560, -80], 'POST', '={{$env.DB_API_URL + "/rpc/save_style_and_knowledge"}}',
       `={{ JSON.stringify({ p_style_profile: $json.style_profile, p_pairs: $json.qa_pairs, p_source_stats: $json.source_stats }) }}`),
     code('Gabungkan Hasil Impor', [1780, -80], combineImportResult),
     ifNumberGreater('Ada Pasangan QA?', [2000, -80], '={{$json.pair_count}}', 0),
-    http('Embedding Knowledge Impor', [2220, -160], 'POST', '={{$env.LM_STUDIO_BASE_URL + "/embeddings"}}',
-      `={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: $json.qa_pairs.map((p) => 'Pertanyaan: ' + p.question + '\\nJawaban: ' + p.answer) }) }}`, lmHeaders),
+    http('Embedding Knowledge Impor', [2220, -160], 'POST', '={{$env.OPENROUTER_BASE_URL + "/embeddings"}}',
+      `={{ JSON.stringify({ model: $env.OPENROUTER_EMBEDDING_MODEL, input: $json.qa_pairs.map((p) => 'Pertanyaan: ' + p.question + '\\nJawaban: ' + p.answer) }) }}`, lmHeaders),
     code('Buat Points Impor', [2440, -160], makePoints),
     http('Upsert Knowledge Impor', [2660, -160], 'PUT', '={{$env.QDRANT_URL + "/collections/" + $env.QDRANT_COLLECTION + "/points?wait=true"}}',
       '={{ JSON.stringify($json) }}'),
@@ -1166,8 +1166,8 @@ return [{
       dataPropertyName: 'file',
       options: {},
     }),
-    http('Embedding Deskripsi Aset', [1200, 140], 'POST', '={{$env.LM_STUDIO_BASE_URL + "/embeddings"}}',
-      `={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: [$json.embedding_text] }) }}`, lmHeaders),
+    http('Embedding Deskripsi Aset', [1200, 140], 'POST', '={{$env.OPENROUTER_BASE_URL + "/embeddings"}}',
+      `={{ JSON.stringify({ model: $env.OPENROUTER_EMBEDDING_MODEL, input: [$json.embedding_text] }) }}`, lmHeaders),
     code('Buat Point Aset Gambar', [1440, 140], prepareAssetPoint),
     http('Upsert Aset ke Qdrant', [1680, 140], 'PUT', '={{$env.QDRANT_URL + "/collections/" + $env.QDRANT_COLLECTION + "/points?wait=true"}}',
       '={{ JSON.stringify($json) }}'),

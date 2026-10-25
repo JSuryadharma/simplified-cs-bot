@@ -31,3 +31,22 @@ export async function readJsonResponse(response) {
   return body;
 }
 
+
+// Embedding lewat OpenRouter (API kompatibel OpenAI). Dipakai skrip host.
+export async function embedTexts(texts, { batchSize = 64 } = {}) {
+  const base = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/+$/, '');
+  const model = process.env.OPENROUTER_EMBEDDING_MODEL || 'openai/text-embedding-3-small';
+  if (!process.env.OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY belum diisi di .env');
+  const vectors = [];
+  for (let i = 0; i < texts.length; i += batchSize) {
+    const batch = texts.slice(i, i + batchSize);
+    const body = await readJsonResponse(await fetch(`${base}/embeddings`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` },
+      body: JSON.stringify({ model, input: batch }),
+    }));
+    if (!Array.isArray(body.data) || body.data.length !== batch.length) throw new Error('jumlah embedding tidak sesuai');
+    vectors.push(...body.data.map((e) => e.embedding));
+  }
+  return vectors;
+}

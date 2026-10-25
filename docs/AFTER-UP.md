@@ -13,8 +13,8 @@ fresh machine; on the current Mac they are already done.
    ```
 
    Check: http://localhost:3500 opens the SaViOr login page.
-2. Start **LM Studio** on the host: load the chat model and the embedding model from `.env`,
-   start the Local Server on port 1234 and turn on **Serve on Local Network**.
+2. Make sure `OPENROUTER_API_KEY` in `.env` is valid and has credit; all AI calls (chat and
+   embeddings) go through OpenRouter. `make doctor` checks the key.
 3. **(first time)** `cp .env.example .env` and fill in every `ganti_...` value, plus
    `OWNER_PHONE`, `NGROK_AUTHTOKEN` and `NGROK_DOMAIN`. Keep `N8N_ENCRYPTION_KEY` the same as
    the old machine if you copy `n8n_data/`.
@@ -38,7 +38,7 @@ Quick checks:
 | http://localhost:5678 | n8n login page |
 | http://localhost:4000 | ticket dashboard |
 | `curl localhost:3002/rpc/dashboard_tickets -X POST -H 'content-type: application/json' -d '{}'` | JSON list of tickets |
-| http://localhost:6333/dashboard | Qdrant UI with collection `wa_knowledge` |
+| http://localhost:6333/dashboard | Qdrant UI with collection `wa_knowledge_openrouter` |
 | http://localhost:4040 | ngrok inspector (only with `COMPOSE_PROFILES=tunnel`) |
 
 `make doctor` checks the services from the host in one go.
@@ -54,7 +54,7 @@ Quick checks:
      Account ID. See `docs/SETUP-META.md`.
    - `OpenAI account`: Base URL `https://openrouter.ai/api/v1` and your OpenRouter key.
 4. Open the workflow **WA Admin - Sistem Lengkap** and make sure it is published/active.
-5. If Qdrant has no `wa_knowledge` collection yet, run the manual part
+5. If Qdrant has no `QDRANT_COLLECTION` collection yet, run the manual part
    **00 — Inisialisasi Qdrant** once from the canvas.
 
 ## 3. Load knowledge (first time)

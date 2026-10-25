@@ -7,9 +7,9 @@ import { randomUUID } from 'node:crypto';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 4000);
 const DB_API_URL = (process.env.DB_API_URL || 'http://host.docker.internal:3001').replace(/\/+$/, '');
-const LM_BASE = (process.env.LM_STUDIO_BASE_URL || 'http://host.docker.internal:1234/v1').replace(/\/+$/, '');
-const LM_TOKEN = process.env.LM_STUDIO_API_TOKEN || 'lm-studio';
-const LM_CHAT_MODEL = process.env.LM_STUDIO_CHAT_MODEL || 'qwen/qwen3.5-9b';
+const LM_BASE = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/+$/, '');
+const LM_TOKEN = process.env.OPENROUTER_API_KEY || '';
+const LM_CHAT_MODEL = process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3-super-120b-a12b';
 const OWNER_PHONE = process.env.OWNER_PHONE || '';
 const WA_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || '';
 const WA_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
@@ -28,7 +28,7 @@ const IMPORT_API_KEY = process.env.IMPORT_API_KEY || '';
 const QDRANT_URL = (process.env.QDRANT_URL || '').replace(/\/+$/, '');
 const QDRANT_COLLECTION = process.env.QDRANT_COLLECTION || 'wa_knowledge';
 const STORAGE_DIR = process.env.STORAGE_DIR || '';
-const LM_EMBED_MODEL = process.env.LM_STUDIO_EMBEDDING_MODEL || 'text-embedding-nomic-embed-text-v1.5';
+const LM_EMBED_MODEL = process.env.OPENROUTER_EMBEDDING_MODEL || 'openai/text-embedding-3-small';
 const SCORE_THRESHOLD = Number(process.env.QDRANT_SCORE_THRESHOLD || 0.6);
 const IMAGE_FILE = /^[\w .()+-]{1,180}\.(jpe?g|png|webp)$/i;
 
@@ -110,15 +110,15 @@ async function summarizeWithLm(question, extra = '') {
       }),
     });
   } catch {
-    throw new Error(`LM Studio tidak dapat dijangkau di ${LM_BASE}. Pastikan server lokal aktif.`);
+    throw new Error(`OpenRouter tidak dapat dijangkau di ${LM_BASE}. Periksa koneksi internet dan OPENROUTER_API_KEY.`);
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(`LM Studio: ${data?.error?.message || `${res.status} ${res.statusText}`}`);
+    throw new Error(`OpenRouter: ${data?.error?.message || `${res.status} ${res.statusText}`}`);
   }
   const content = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.message?.reasoning_content || '';
   const text = String(content).trim().replace(/^```(?:text|markdown)?/i, '').replace(/```$/, '').trim();
-  if (!text) throw new Error('LM Studio tidak menghasilkan ringkasan.');
+  if (!text) throw new Error('OpenRouter tidak menghasilkan ringkasan.');
   return text;
 }
 
@@ -357,7 +357,7 @@ async function importKnowledge(body) {
   return { status: result.status >= 200 && result.status < 300 ? 200 : (result.status || 502), data: { ...result.data, images: { saved, kept, rejected } } };
 }
 
-// Cari knowledge seperti bot: embedding "search_query: ..." lalu query Qdrant. Hasil di bawah ambang
+// Cari knowledge seperti bot: embedding pertanyaan lalu query Qdrant. Hasil di bawah ambang
 // skor juga ditampilkan (ditandai) supaya terlihat kenapa bot tidak memakainya.
 async function searchKnowledge(q, limit) {
   if (!QDRANT_URL) throw new Error('QDRANT_URL belum diatur untuk dashboard.');
@@ -367,12 +367,12 @@ async function searchKnowledge(q, limit) {
   try {
     const res = await fetch(`${LM_BASE}/embeddings`, {
       method: 'POST', headers: { authorization: `Bearer ${LM_TOKEN}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ model: LM_EMBED_MODEL, input: [`search_query: ${text}`] }), signal: AbortSignal.timeout(30_000),
+      body: JSON.stringify({ model: LM_EMBED_MODEL, input: [text] }), signal: AbortSignal.timeout(30_000),
     });
     emb = await res.json();
     if (!res.ok) throw new Error(emb?.error?.message || res.status);
   } catch (err) {
-    throw new Error(`Embedding LM Studio gagal (${LM_BASE}): ${err.message}`);
+    throw new Error(`Embedding OpenRouter gagal (${LM_BASE}): ${err.message}`);
   }
   const res = await fetch(`${QDRANT_URL}/collections/${QDRANT_COLLECTION}/points/query`, {
     method: 'POST', headers: { 'content-type': 'application/json' },

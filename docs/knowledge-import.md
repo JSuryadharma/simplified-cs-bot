@@ -1,6 +1,6 @@
 # Knowledge base: dataset, impor, dan aturan bot
 
-Knowledge bot disimpan di Qdrant (`wa_knowledge`) dan ringkasannya di `bot.knowledge_items`.
+Knowledge bot disimpan di Qdrant (`QDRANT_COLLECTION`, saat ini `wa_knowledge_openrouter`) dan ringkasannya di `bot.knowledge_items`.
 Setiap point punya label sehingga bot bisa membedakan jenis informasi.
 
 ## Label
