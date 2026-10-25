@@ -36,6 +36,9 @@ riwayat chat tidak disimpan. Skema lama ada di `legacy/db/`.
 | mock-whatsapp | 127.0.0.1:8080 | gateway WhatsApp tiruan untuk uji lokal |
 | tunnel | https://`NGROK_DOMAIN` (inspector 127.0.0.1:4040) | ngrok ke n8n untuk webhook Meta, aktif dengan `COMPOSE_PROFILES=tunnel` |
 
+Port, alamat bind dan URL publik tiap service bisa diatur lewat `.env` (untuk nginx/subpath),
+lihat `docs/AFTER-UP.md` bagian 7 dan `docs/nginx.example.conf`.
+
 Aplikasi utama SaViOr berjalan dari compose-nya sendiri (`../GitHub/savior-app`):
 `savior-web` (http://localhost:3500) dan `savior-postgres` (port 5433). Stack ini hanya
 pendukung dan tidak menjalankan aplikasi SaViOr.

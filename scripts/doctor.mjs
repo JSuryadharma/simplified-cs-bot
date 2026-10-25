@@ -4,12 +4,13 @@ loadEnv();
 
 const openRouterUrl = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
 const openRouterAuth = { authorization: `Bearer ${process.env.OPENROUTER_API_KEY || ''}` };
-const n8nPort = process.env.N8N_PORT || '5678';
+const port = (name, fallback) => process.env[name] || fallback;
 
 const checks = [
-  ['n8n', `http://127.0.0.1:${n8nPort}/healthz`],
-  ['Qdrant', 'http://127.0.0.1:6333/healthz'],
-  ['Mock WhatsApp', 'http://127.0.0.1:8080/health'],
+  ['n8n', `http://127.0.0.1:${port('N8N_PORT', '5678')}/healthz`],
+  ['Qdrant', `http://127.0.0.1:${port('QDRANT_PORT', '6333')}/healthz`],
+  ['Mock WhatsApp', `http://127.0.0.1:${port('MOCK_WHATSAPP_PORT', '8080')}/health`],
+  ['Dashboard', `http://127.0.0.1:${port('DASHBOARD_PORT', '4000')}/api/health`],
   ['OpenRouter', `${openRouterUrl}/key`, openRouterAuth],
 ];
 

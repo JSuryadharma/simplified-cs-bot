@@ -107,3 +107,53 @@ and read the replies with `curl http://localhost:8080/messages`.
   ```
 
 - After a reboot: start SaViOr's compose first, then `make up`.
+
+## 7. Reverse proxy (nginx) and public URLs
+
+Every service's host port, bind address and public URL comes from `.env`; the defaults
+keep the local setup above (n8n 5678, dashboard 4000, PostgREST 3002, Qdrant 6333,
+mock WhatsApp 8080, ngrok inspector 4040). A full nginx example with subpaths is in
+[`docs/nginx.example.conf`](nginx.example.conf).
+
+| Service | Port / bind | Public URL / subpath |
+|---|---|---|
+| n8n | `N8N_PORT`, `N8N_BIND` | `N8N_HOST`, `N8N_PROTOCOL`, `N8N_PATH`, `WEBHOOK_URL`, `N8N_EDITOR_BASE_URL`, `N8N_PROXY_HOPS`, `N8N_SECURE_COOKIE` |
+| wa-dashboard | `DASHBOARD_PORT`, `DASHBOARD_BIND` | `DASHBOARD_BASE_PATH` |
+| PostgREST | `DB_API_PORT`, `DB_API_BIND` | `DB_API_PUBLIC_URL` (OpenAPI only) |
+| Qdrant | `QDRANT_PORT`, `QDRANT_BIND` | none |
+| mock WhatsApp | `MOCK_WHATSAPP_PORT`, `MOCK_WHATSAPP_BIND` | none |
+| ngrok inspector | `NGROK_INSPECTOR_PORT` | none |
+
+Containers keep talking to each other over the compose network (`http://n8n:5678`,
+`http://db-api:3000`, ...), so changing a public URL or host port never breaks the bot's
+internal calls.
+
+Hosting n8n under a subpath, for example `https://bot.example.com/n8n/`:
+
+```dotenv
+N8N_HOST=bot.example.com
+N8N_PROTOCOL=https
+N8N_PATH=/n8n/
+WEBHOOK_URL=https://bot.example.com/n8n/
+N8N_EDITOR_BASE_URL=https://bot.example.com/n8n/
+N8N_PROXY_HOPS=1
+N8N_SECURE_COOKIE=true
+N8N_BIND=127.0.0.1
+COMPOSE_PROFILES=
+```
+
+- n8n always serves from `/` on port 5678; `N8N_PATH` only changes the URLs it generates.
+  nginx must strip the prefix: `location /n8n/ { proxy_pass http://127.0.0.1:5678/; }`
+  (both end in `/`). Without the trailing slash the editor loads blank and webhooks 404.
+- Meta's callback URL becomes `https://bot.example.com/n8n/webhook/whatsapp`; update it in
+  Meta for Developers after switching.
+- Set `N8N_PUBLIC_URL` too if you run the host scripts (`simulate-inbound`, `upsert-order`)
+  against the proxied URL.
+
+Hosting the dashboard under a subpath: set `DASHBOARD_BASE_PATH=/wa-dashboard/` and proxy
+`location /wa-dashboard/` to `http://127.0.0.1:4000/`. The dashboard accepts the prefix
+stripped or kept. It has no login of its own, so put basic auth or an IP allowlist on it
+in nginx. Never proxy PostgREST or Qdrant to the internet: neither has authentication.
+
+Apply changes with `make up` (recreates n8n and the dashboard, which pauses the bot for
+a moment).

@@ -453,7 +453,7 @@ const CHANNEL_LABEL = { 'n8n-webhook': 'WhatsApp via n8n', 'whatsapp-cloud-api':
 async function loadHealth() {
   const el = $('#status');
   try {
-    const h = await api('/api/health');
+    const h = await api('api/health');
     state.health = h;
     el.classList.toggle('off', !h.wa_configured);
     $('#statusText').textContent = h.wa_configured ? (CHANNEL_LABEL[h.wa_channel] || 'WhatsApp aktif') : 'Pengiriman WA belum aktif';
@@ -467,7 +467,7 @@ async function loadHealth() {
 /* ---------- Tickets ---------- */
 async function loadTickets() {
   try {
-    const data = await api('/api/tickets');
+    const data = await api('api/tickets');
     const before = state.tickets.find((x) => x.ticket_id === state.selected);
     state.tickets = data.tickets || [];
     const open = state.tickets.filter(isOpen).length;
@@ -600,7 +600,7 @@ async function summarize(t, btn, saveOnly) {
   try {
     const body = saveOnly ? { summary: $('#summaryBox').value.trim() } : {};
     if (saveOnly && !body.summary) throw new Error('Ringkasan kosong.');
-    const r = await post('/api/tickets/' + t.ticket_id + '/summarize', body);
+    const r = await post('api/tickets/' + t.ticket_id + '/summarize', body);
     if (r.needs_summary) $('#summaryBox').value = r.needs_summary;
     t.needs_summary = $('#summaryBox').value;
     renderList();
@@ -622,7 +622,7 @@ async function sendReply(t) {
   btn.innerHTML = '<span class="spin"></span>Mengirim';
   showResult('', '');
   try {
-    const r = await post('/api/tickets/' + t.ticket_id + '/reply', { reply });
+    const r = await post('api/tickets/' + t.ticket_id + '/reply', { reply });
     toast('Terkirim ke ' + r.customer_phone + '. Tiket #' + r.ticket_code + ' selesai.', 'ok');
     box.value = '';
     await loadTickets();
@@ -642,7 +642,7 @@ async function resend(t) {
   btn.disabled = true;
   btn.textContent = 'Mengirim…';
   try {
-    await post('/api/tickets/' + t.ticket_id + '/resend');
+    await post('api/tickets/' + t.ticket_id + '/resend');
     showResult('ok', 'Jawaban terkirim ulang ke ' + t.customer_phone + '.');
     toast('Terkirim ulang.', 'ok');
   } catch (err) {
@@ -668,7 +668,7 @@ const chartOpts = {
 async function loadMonth() {
   const month = $('#monthPicker').value || localDate().slice(0, 7);
   $('#monthHint').textContent = monthLabel(month);
-  const data = await api('/api/orders/month?month=' + month);
+  const data = await api('api/orders/month?month=' + month);
   $('#kpiOrders').textContent = fmt.format(data.total_orders || 0);
   $('#kpiOrdersNote').textContent = fmtRp(data.total_value) + ' · ' + monthLabel(month);
   $('#kpiConfirmed').textContent = fmt.format(data.confirmed_orders || 0);
@@ -709,7 +709,7 @@ function renderDay(container, data, title) {
 
 async function loadOrders() {
   const date = $('#datePicker').value || localDate();
-  const data = await api('/api/orders?date=' + date);
+  const data = await api('api/orders?date=' + date);
   renderDay($('#colCurrent'), data.current, 'Tanggal terpilih');
   renderDay($('#colPrevious'), data.previous, 'Hari sebelumnya');
   $('#kpiDay').textContent = fmt.format(data.current.total_orders);
@@ -805,7 +805,7 @@ async function kbPreview() {
   $('#kbResult').innerHTML = '<div class="alert warn">Membaca dan melabeli data. Untuk chat, pelabelan bisa memakan beberapa menit; belum ada data yang diubah.</div>';
   try {
     const files = await kbReadFiles();
-    const r = await post('/api/knowledge/import', { ...kbPayloadBase(), ...files, dry_run: true });
+    const r = await post('api/knowledge/import', { ...kbPayloadBase(), ...files, dry_run: true });
     if (!kb.loaded) await loadKnowledge();
     kb.preview = { ...r, images: files.images };
     kbRenderPreview();
@@ -854,7 +854,7 @@ async function kbImport() {
   kbBusy(btn, 'Menyimpan…');
   try {
     // Kirim dataset hasil pratinjau, jadi chat tidak dilabeli ulang
-    const r = await post('/api/knowledge/import', { ...kbPayloadBase(), dataset: p.dataset, chats: [], images: p.images || [] });
+    const r = await post('api/knowledge/import', { ...kbPayloadBase(), dataset: p.dataset, chats: [], images: p.images || [] });
     const types = Object.entries(r.by_type || {}).map(([k, v]) => (KB_TYPE[k] || k) + ': ' + v).join(' · ');
     $('#kbResult').innerHTML = '<div class="alert ok">Tersimpan: ' + fmt.format(r.written || 0) + ' knowledge' + (r.replaced ? ' (knowledge lama diganti)' : '') + '. ' + esc(types) + '</div>' +
       (r.images && r.images.saved.length ? '<div class="muted">Gambar baru disimpan: ' + r.images.saved.length + '</div>' : '');
@@ -880,11 +880,11 @@ async function kbSearch() {
   const btn = $('#kbQueryBtn');
   kbBusy(btn, 'Mencari…');
   try {
-    const r = await post('/api/knowledge/search', { q, limit: 10 });
+    const r = await post('api/knowledge/search', { q, limit: 10 });
     const used = r.results.filter((x) => x.used).length;
     $('#kbHits').innerHTML = '<div class="muted">' + used + ' hasil di atas ambang skor ' + r.threshold + ' (dipakai bot), ' + (r.results.length - used) + ' di bawahnya.</div>' +
       (r.results.length ? r.results.map((h) => '<div class="hit' + (h.used ? '' : ' below') + '"><div class="score">' + h.score.toFixed(3) + '<small>' + (h.used ? 'dipakai' : 'di bawah ambang') + '</small></div><div>' +
-        (h.type === 'image_asset' ? '<img loading="lazy" src="/api/knowledge/image/' + encodeURIComponent(h.file) + '" alt="">' : '') +
+        (h.type === 'image_asset' ? '<img loading="lazy" src="api/knowledge/image/' + encodeURIComponent(h.file) + '" alt="">' : '') +
         '<span class="kind">' + esc(KB_TYPE[h.type] || h.type) + (h.asset_kind ? ' · ' + esc(KB_KIND[h.asset_kind] || h.asset_kind) : '') + (h.category ? ' · ' + esc(h.category.replace(/_/g, ' ')) : '') + '</span>' +
         (h.type === 'image_asset' ? '<div class="q">' + esc(h.asset_id) + '</div><div class="muted">' + esc(h.caption) + '</div>'
           : '<div class="q">' + esc(h.question) + '</div><div>' + esc(h.answer) + '</div>' + (h.auto_reply ? '' : '<div class="muted" style="font-size:11.5px">hanya untuk owner (bot tidak mengutip)</div>')) +
@@ -909,7 +909,7 @@ function kbRenderList() {
 
 async function loadKnowledge() {
   try {
-    const d = await api('/api/knowledge');
+    const d = await api('api/knowledge');
     kb.data = d;
     kb.loaded = true;
     const t = d.by_type || {};
@@ -921,7 +921,7 @@ async function loadKnowledge() {
       ['Aset gambar', t.image_asset || 0, d.storage_images != null ? d.storage_images + ' gambar di storage' : ''],
     ].map(([l, v, n]) => '<div class="kpi"><div class="label">' + l + '</div><div class="value">' + fmt.format(v) + '</div><div class="note">' + esc(n) + '</div></div>').join('');
     $('#kbGallery').innerHTML = d.assets.length ? d.assets.map((a) =>
-      '<div class="asset"><img loading="lazy" src="/api/knowledge/image/' + encodeURIComponent(a.file) + '" alt="' + esc(a.caption) + '"><div class="meta"><span class="kind">' + esc(KB_KIND[a.kind] || a.kind || 'gambar') + '</span><b>' + esc(a.asset_id) + '</b><span class="muted">' + esc(a.caption) + '</span></div></div>').join('')
+      '<div class="asset"><img loading="lazy" src="api/knowledge/image/' + encodeURIComponent(a.file) + '" alt="' + esc(a.caption) + '"><div class="meta"><span class="kind">' + esc(KB_KIND[a.kind] || a.kind || 'gambar') + '</span><b>' + esc(a.asset_id) + '</b><span class="muted">' + esc(a.caption) + '</span></div></div>').join('')
       : '<div class="empty">Belum ada aset gambar.</div>';
     $('#kbCats').innerHTML = '<button class="filter' + (kb.cat === 'all' ? ' active' : '') + '" data-cat="all">Semua</button>' +
       [...new Set(d.items.map((it) => it.category).filter(Boolean))].sort().map((c) => '<button class="filter' + (kb.cat === c ? ' active' : '') + '" data-cat="' + esc(c) + '">' + esc(c.replace(/_/g, ' ')) + '</button>').join('');
