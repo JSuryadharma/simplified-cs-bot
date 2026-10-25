@@ -36,13 +36,13 @@ doctor:
 # Database bot ada di Postgres milik SaViOr (container savior-postgres, ../GitHub/savior-app)
 SAVIOR_PG = docker exec -i savior-postgres psql -U savior -d savior -v ON_ERROR_STOP=1
 
-# Sekali untuk database SaViOr baru: buat role wa_admin/n8n_bot + skema bot dari db/*.sql
+# Sekali untuk database SaViOr baru: buat role n8n_bot (+ POSTGRES_USER bila belum ada) + skema bot dari db/*.sql
 db-init:
 	sh scripts/db-init.sh
 
 # Terapkan satu file SQL bot ke database yang sudah ada: make db-migrate FILE=db/00x-....sql
 db-migrate:
-	{ echo 'SET ROLE wa_admin;'; cat $(FILE); } | $(SAVIOR_PG)
+	u=$$(grep -E '^POSTGRES_USER=' .env | cut -d= -f2-); { echo "SET ROLE $${u:-wa_admin};"; cat $(FILE); } | $(SAVIOR_PG)
 	$(COMPOSE) restart db-api
 
 # Backup database SaViOr (termasuk skema bot), snapshot Qdrant, dan n8n_data ke backups/stack_<waktu>/

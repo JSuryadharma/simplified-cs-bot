@@ -20,9 +20,15 @@ x-n8n-env: &n8n-env
   # n8n memakai SQLite di ./n8n_data (database.sqlite), jadi setiap perubahan
   # workflow/credential langsung tersimpan di folder itu.
   N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?isi N8N_ENCRYPTION_KEY di .env}
+  # URL publik n8n. Di belakang reverse proxy (nginx) dengan subpath, mis. https://bot.example.com/n8n/:
+  #   N8N_PATH=/n8n/  WEBHOOK_URL=https://bot.example.com/n8n/  N8N_EDITOR_BASE_URL=https://bot.example.com/n8n/
+  # n8n tetap melayani di root port 5678, jadi proxy harus membuang prefix (lihat docs/nginx.example.conf).
   N8N_HOST: ${N8N_HOST:-localhost}
   N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
+  N8N_PATH: ${N8N_PATH:-/}
   WEBHOOK_URL: ${WEBHOOK_URL:-http://localhost:5678/}
+  N8N_EDITOR_BASE_URL: ${N8N_EDITOR_BASE_URL:-}
+  N8N_PROXY_HOPS: ${N8N_PROXY_HOPS:-0}
   N8N_SECURE_COOKIE: ${N8N_SECURE_COOKIE:-false}
   GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Asia/Jakarta}
   TZ: ${GENERIC_TIMEZONE:-Asia/Jakarta}
@@ -68,9 +74,11 @@ services:
       PGRST_DB_CHANNEL_ENABLED: "true"
       PGRST_ADMIN_SERVER_PORT: "3001"     # hanya untuk healthcheck
       PGRST_ADMIN_SERVER_HOST: localhost
+      # URL publik PostgREST untuk dokumen OpenAPI bila diproxy (jangan buka ke internet tanpa auth)
+      PGRST_OPENAPI_SERVER_PROXY_URI: ${DB_API_PUBLIC_URL:-}
     networks: [default, savior]
     ports:
-      - "127.0.0.1:3002:3000"
+      - "${DB_API_BIND:-127.0.0.1}:${DB_API_PORT:-3002}:3000"
     healthcheck:
       test: ["CMD", "postgrest", "--ready"]
       interval: 10s
@@ -80,7 +88,7 @@ services:
     image: qdrant/qdrant:v1.18.2
     restart: unless-stopped
     ports:
-      - "127.0.0.1:6333:6333"
+      - "${QDRANT_BIND:-127.0.0.1}:${QDRANT_PORT:-6333}:6333"
     volumes:
       - qdrant_data:/qdrant/storage
     healthcheck:
@@ -97,7 +105,7 @@ services:
     environment: *n8n-env
     extra_hosts: ["host.docker.internal:host-gateway"]
     ports:
-      - "5678:5678"
+      - "${N8N_BIND:-0.0.0.0}:${N8N_PORT:-5678}:5678"
     volumes:
       - ./n8n_data:/home/node/.n8n     # workflow, credential, aset upload
       - ./workflows:/workflows:ro
@@ -117,6 +125,8 @@ services:
       db-api: { condition: service_healthy }
     environment:
       PORT: "4000"
+      # Subpath dashboard di belakang reverse proxy, mis. /wa-dashboard/ (default: root)
+      BASE_PATH: ${DASHBOARD_BASE_PATH:-/}
       TZ: ${GENERIC_TIMEZONE:-Asia/Jakarta}
       DB_API_URL: http://db-api:3000
       OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
@@ -139,7 +149,7 @@ services:
       QDRANT_SCORE_THRESHOLD: ${QDRANT_SCORE_THRESHOLD:-0.55}
     extra_hosts: ["host.docker.internal:host-gateway"]
     ports:
-      - "4000:4000"
+      - "${DASHBOARD_BIND:-0.0.0.0}:${DASHBOARD_PORT:-4000}:4000"
     volumes:
       - ./dashboard:/app:ro
       - ./n8n_data/storage:/storage
@@ -157,7 +167,7 @@ services:
     environment:
       PORT: "8080"
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${MOCK_WHATSAPP_BIND:-127.0.0.1}:${MOCK_WHATSAPP_PORT:-8080}:8080"
     volumes:
       - ./mock-whatsapp/server.mjs:/app/server.mjs:ro
     healthcheck:
@@ -179,7 +189,7 @@ services:
       NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
     command: ["http", "--url=${NGROK_DOMAIN:-}", "n8n:5678", "--log=stdout"]
     ports:
-      - "127.0.0.1:4040:4040"
+      - "127.0.0.1:${NGROK_INSPECTOR_PORT:-4040}:4040"
 
 # Jaringan compose milik ../GitHub/savior-app (nama default: <folder>_default).
 # db-api memakai jaringan ini untuk menjangkau container savior-postgres.

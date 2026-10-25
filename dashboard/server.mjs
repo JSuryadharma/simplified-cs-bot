@@ -6,6 +6,8 @@ import { randomUUID } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 4000);
+// Subpath di belakang reverse proxy, mis. "/wa-dashboard". Proxy boleh membuang prefix atau tidak.
+const BASE_PATH = ('/' + (process.env.BASE_PATH || '')).replace(/\/{2,}/g, '/').replace(/\/+$/, '');
 const DB_API_URL = (process.env.DB_API_URL || 'http://host.docker.internal:3001').replace(/\/+$/, '');
 const LM_BASE = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/+$/, '');
 const LM_TOKEN = process.env.OPENROUTER_API_KEY || '';
@@ -394,7 +396,12 @@ async function searchKnowledge(q, limit) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  const path = url.pathname;
+  if (BASE_PATH && url.pathname === BASE_PATH) {
+    // URL relatif di index.html butuh garis miring penutup
+    res.writeHead(301, { location: BASE_PATH + '/' + url.search });
+    return res.end();
+  }
+  const path = BASE_PATH && url.pathname.startsWith(BASE_PATH + '/') ? url.pathname.slice(BASE_PATH.length) : url.pathname;
 
   try {
     if (req.method === 'GET' && (path === '/' || path === '/index.html')) {
@@ -580,5 +587,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  process.stdout.write(`[wa-dashboard] listening on :${PORT} (tz=${TZ})\n`);
+  process.stdout.write(`[wa-dashboard] listening on :${PORT}${BASE_PATH} (tz=${TZ})\n`);
 });
