@@ -20,8 +20,8 @@ x-n8n-env: &n8n-env
   # n8n memakai SQLite di ./n8n_data (database.sqlite), jadi setiap perubahan
   # workflow/credential langsung tersimpan di folder itu.
   N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?isi N8N_ENCRYPTION_KEY di .env}
-  # URL publik n8n. Di belakang reverse proxy (nginx) dengan subpath, mis. https://jsur.site/n8n/:
-  #   N8N_PATH=/n8n/  WEBHOOK_URL=https://jsur.site/n8n/  N8N_EDITOR_BASE_URL=https://jsur.site/n8n/
+  # URL publik n8n. Di belakang reverse proxy (nginx) dengan subpath, mis. https://bot.example.com/n8n/:
+  #   N8N_PATH=/n8n/  WEBHOOK_URL=https://bot.example.com/n8n/  N8N_EDITOR_BASE_URL=https://bot.example.com/n8n/
   # n8n tetap melayani di root port 5678, jadi proxy harus membuang prefix (lihat docs/nginx.example.conf).
   N8N_HOST: ${N8N_HOST:-localhost}
   N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
