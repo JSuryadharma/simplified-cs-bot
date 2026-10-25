@@ -1,0 +1,3254 @@
+{
+  "id": "WaAdm1nLengkap26",
+  "name": "WA Admin - Sistem Lengkap",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "# WA Admin — Workflow Lengkap\n\nSatu workflow ini berisi enam alur yang dibedakan oleh trigger masing-masing. Semuanya berbagi database, Qdrant, LM Studio, environment, dan volume aset yang sama.\n\nUrutan membaca canvas: **00 Setup → 01 Verifikasi Meta → 02 Router Utama → 03 Impor Chat → 04 Sinkronisasi Order → 05 Upload Knowledge/Aset**.",
+        "width": 1600,
+        "height": 320,
+        "color": 7
+      },
+      "id": "00000000-0000-4000-8000-000000000134",
+      "name": "CATATAN UTAMA - Peta Workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -2200
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 00 — Inisialisasi Qdrant\n\n**Kapan dijalankan:** manual, satu kali saat instalasi atau setelah mengganti model embedding.\n\n**Cara kerja:**\n1. Memeriksa apakah collection Qdrant sudah ada.\n2. Jika ada, alur selesai tanpa mengubah data.\n3. Jika belum ada, meminta satu embedding ke LM Studio.\n4. Panjang vector dari model dipakai sebagai dimensi collection.\n5. Collection dibuat dengan distance **Cosine**.\n\n**Hasil:** collection siap dipakai oleh alur RAG. Bagian ini tidak berjalan otomatis saat pesan WhatsApp masuk.",
+        "width": 440,
+        "height": 520,
+        "color": 4
+      },
+      "id": "00000000-0000-4000-8000-000000000010",
+      "name": "CATATAN 00 - Setup Qdrant",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -1780
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "00000000-0000-4000-8000-000000000001",
+      "name": "Jalankan Setup",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -1600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.QDRANT_URL + \"/collections/\" + $env.QDRANT_COLLECTION}}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json",
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000002",
+      "name": "Cek Collection",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        220,
+        -1600
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000003",
+              "leftValue": "={{String($json.statusCode)}}",
+              "rightValue": "200",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000004",
+      "name": "Sudah Ada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        -1600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ready: true, created: false, collection: $env.QDRANT_COLLECTION, message: 'Collection Qdrant sudah tersedia.' } }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000005",
+      "name": "Collection Sudah Siap",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        -1700
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LM_STUDIO_BASE_URL + \"/embeddings\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.LM_STUDIO_API_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: ['inisialisasi basis pengetahuan WhatsApp'] }) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000006",
+      "name": "Tes Embedding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        680,
+        -1500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const vector = $json.data?.[0]?.embedding;\nif (!Array.isArray(vector) || vector.length === 0) {\n  throw new Error('LM Studio tidak mengembalikan embedding. Pastikan server aktif dan model embedding sudah dimuat.');\n}\nreturn [{ json: { dimension: vector.length } }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000007",
+      "name": "Baca Dimensi",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        -1500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{$env.QDRANT_URL + \"/collections/\" + $env.QDRANT_COLLECTION}}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ vectors: { size: $json.dimension, distance: 'Cosine' } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000008",
+      "name": "Buat Collection",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        -1500
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 01 — Verifikasi Webhook Meta\n\n**Trigger:** `GET /webhook/whatsapp`\n\nMeta mengirim `hub.mode`, `hub.verify_token`, dan `hub.challenge`.\n\n- Token dibandingkan dengan `WHATSAPP_VERIFY_TOKEN`.\n- Jika cocok: challenge dikembalikan dengan HTTP 200.\n- Jika salah: request ditolak dengan HTTP 403.\n\nAlur ini hanya untuk proses verifikasi callback, bukan untuk menerima pesan pelanggan.",
+        "width": 440,
+        "height": 400,
+        "color": 5
+      },
+      "id": "00000000-0000-4000-8000-000000000016",
+      "name": "CATATAN 01 - Verifikasi Meta",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -1050
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000012",
+      "name": "Verifikasi Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -900
+      ],
+      "webhookId": "00000000-0000-4000-8000-000000000011"
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $json.query || {};\nconst mode = String(query['hub.mode'] || '');\nconst token = String(query['hub.verify_token'] || '');\nconst challenge = String(query['hub.challenge'] || '');\nconst valid = mode === 'subscribe' && token === String($env.WHATSAPP_VERIFY_TOKEN || '');\nreturn [{ json: valid\n  ? { statusCode: 200, body: challenge }\n  : { statusCode: 403, body: 'Token verifikasi tidak valid' }\n}];"
+      },
+      "id": "00000000-0000-4000-8000-000000000013",
+      "name": "Validasi Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -900
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{$json.body}}",
+        "options": {
+          "responseCode": "={{$json.statusCode}}"
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000014",
+      "name": "Jawab Verifikasi",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        480,
+        -900
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 02 — Router Utama WhatsApp\n\n**Trigger:** `POST /webhook/whatsapp`\n\n**Pesan pelanggan:**\n1. Validasi signature Meta jika `WHATSAPP_APP_SECRET` diisi.\n2. Simpan pesan dan deduplikasi melalui database.\n3. Ambil order pelanggan dan profil gaya owner.\n4. Cari knowledge relevan di Qdrant.\n5. LM Studio memilih **AUTO_REPLY** atau **ESCALATE** secara fail-closed (panggilan HTTP langsung ke `/chat/completions` dengan `response_format: json_schema`).\n   Catatan: percobaan mengganti node ini dengan node native **AI Agent** (LangChain) gagal stabil di n8n 2.37.10 — request macet tanpa error, CPU/koneksi jaringan 0%, baik dengan LM Studio maupun OpenRouter (free & paid). Lihat laporan gap knowledge untuk detail.\n6. Jika knowledge/order cukup, kirim jawaban bergaya owner memakai node native **WhatsApp Business Cloud**.\n7. Jika pelanggan meminta referensi dan ada `image_asset` yang relevan, node native mengunggah binary gambar dan mengirimkannya setelah balasan teks.\n8. Jika tidak cukup, kirim ringkasan ke owner dan diam kepada pelanggan.\n\n**Pesan owner:**\n- `#TKT-XXXXXXXX jawaban`: diteruskan persis ke pelanggan, tiket diselesaikan, lalu Q&A disimpan ke Qdrant.\n- `/pesanan`: membuat ringkasan order.\n- Pesan pelanggan tambahan saat menunggu owner hanya disimpan dan tidak dibalas.\n\n**Koneksi WhatsApp keluar:** enam node pengiriman memakai credential n8n **WhatsApp account** dan sender test Meta `+1 (555) 648-4067` (Phone Number ID `1233522196505651`). Access token disimpan di credential n8n, bukan di parameter HTTP workflow.",
+        "width": 440,
+        "height": 760,
+        "color": 3
+      },
+      "id": "00000000-0000-4000-8000-000000000071",
+      "name": "CATATAN 02 - Router WhatsApp",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp",
+        "responseMode": "onReceived",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000018",
+      "name": "Webhook Pesan WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        500
+      ],
+      "webhookId": "00000000-0000-4000-8000-000000000017"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { createHmac, timingSafeEqual } = require('crypto');\nconst item = $input.first();\nconst body = item.json.body || {};\nconst headers = item.json.headers || {};\nconst appSecret = String($env.WHATSAPP_APP_SECRET || '');\n\nif (appSecret) {\n  const actual = String(headers['x-hub-signature-256'] || headers['X-Hub-Signature-256'] || '');\n  const rawBase64 = item.binary?.data?.data || '';\n  const raw = Buffer.from(rawBase64, 'base64');\n  const expected = 'sha256=' + createHmac('sha256', appSecret).update(raw).digest('hex');\n  const a = Buffer.from(actual);\n  const b = Buffer.from(expected);\n  if (!actual || a.length !== b.length || !timingSafeEqual(a, b)) {\n    return [{ json: { kind: 'invalid_signature' } }];\n  }\n}\n\nconst value = body.entry?.[0]?.changes?.[0]?.value || {};\nconst messages = Array.isArray(value.messages) ? value.messages : [];\nif (!messages.length) return [{ json: { kind: 'ignore', reason: 'status_or_empty_event' } }];\n\nconst contacts = value.contacts || [];\nconst ownerPhone = String($env.OWNER_PHONE || '').replace(/\\D/g, '');\nconst output = [];\nfor (const message of messages) {\n  const phone = String(message.from || '').replace(/\\D/g, '');\n  let text = '';\n  if (message.type === 'text') text = message.text?.body || '';\n  else if (message.type === 'button') text = message.button?.text || '';\n  else if (message.type === 'interactive') {\n    text = message.interactive?.button_reply?.title || message.interactive?.list_reply?.title || '';\n  } else {\n    text = '[Pelanggan mengirim pesan tipe ' + String(message.type || 'tidak dikenal') + '. Perlu ditangani owner.]';\n  }\n  const contact = contacts.find((x) => String(x.wa_id || '').replace(/\\D/g, '') === phone) || contacts[0] || {};\n  output.push({ json: {\n    kind: 'message',\n    message_id: String(message.id || ('generated-' + Date.now())),\n    phone,\n    name: contact.profile?.name || (phone === ownerPhone ? String($env.OWNER_NAME || 'Owner') : 'Pelanggan'),\n    text: String(text).trim(),\n    timestamp: new Date(Number(message.timestamp || Math.floor(Date.now() / 1000)) * 1000).toISOString(),\n    is_owner: phone !== '' && phone === ownerPhone,\n    message_type: message.type || 'text'\n  } });\n}\nreturn output;"
+      },
+      "id": "00000000-0000-4000-8000-000000000019",
+      "name": "Normalisasi dan Verifikasi",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000020",
+              "leftValue": "={{$json.kind}}",
+              "rightValue": "message",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000021",
+      "name": "Event Pesan?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        460,
+        500
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "00000000-0000-4000-8000-000000000022",
+      "name": "Abaikan Event",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        680,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000023",
+              "leftValue": "={{String($json.is_owner)}}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000024",
+      "name": "Dari Owner?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        680,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.DB_API_URL + \"/rpc/receive_owner\"}}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_message_id: $json.message_id, p_phone: $json.phone, p_text: $json.text, p_timestamp: $json.timestamp }) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000025",
+      "name": "DB Terima Owner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        920,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst value = Array.isArray(raw) ? (raw[0] ?? {}) : raw;\nreturn [{ json: value?.result && Object.keys(value).length === 1 ? value.result : value }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000026",
+      "name": "Hasil Owner",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000027",
+              "leftValue": "={{$json.action}}",
+              "rightValue": "forward_customer",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000028",
+      "name": "Balasan Tiket?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "1233522196505651",
+        "recipientPhoneNumber": "={{$json.customer_phone}}",
+        "messageType": "text",
+        "textBody": "={{$json.owner_answer}}",
+        "additionalFields": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000029",
+      "name": "Teruskan Jawaban Owner",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1600,
+        -180
+      ],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "GWHOrCyNFPuKQ7zL",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.DB_API_URL + \"/rpc/complete_owner_reply\"}}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_ticket_id: $('Hasil Owner').first().json.ticket_id, p_provider_message_id: $json.messages?.[0]?.id || null }) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000030",
+      "name": "Selesaikan Tiket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1840,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst value = Array.isArray(raw) ? (raw[0] ?? {}) : raw;\nreturn [{ json: value?.result && Object.keys(value).length === 1 ? value.result : value }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Hasil Tiket Selesai",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LM_STUDIO_BASE_URL + \"/embeddings\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.LM_STUDIO_API_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: ['Pertanyaan: ' + $json.question + '\\nJawaban: ' + $json.answer] }) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000032",
+      "name": "Embedding Jawaban Owner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2280,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const done = $('Hasil Tiket Selesai').first().json;\nconst vector = $json.data?.[0]?.embedding;\nif (!Array.isArray(vector)) throw new Error('Embedding jawaban owner gagal dibuat.');\nreturn [{ json: { points: [{ id: done.ticket_id, vector, payload: { content_type: 'chat_qa', question: done.question, answer: done.answer, text: 'Pertanyaan: ' + done.question + '\\nJawaban: ' + done.answer, source: done.source, ticket_code: done.ticket_code, updated_at: new Date().toISOString() } }] } }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000033",
+      "name": "Point Jawaban Owner",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2500,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{$env.QDRANT_URL + \"/collections/\" + $env.QDRANT_COLLECTION + \"/points?wait=true\"}}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000034",
+      "name": "Upsert Knowledge Owner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2720,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000035",
+              "leftValue": "={{$json.action}}",
+              "rightValue": "summarize_orders",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000036",
+      "name": "Perintah Pesanan?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1600,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst requestBody = {\n  model: $env.LM_STUDIO_CHAT_MODEL,\n  temperature: 0.2,\n  max_tokens: 700,\n  messages: [\n    { role: 'system', content: 'Anda admin operasional toko. Buat ringkasan order dalam Bahasa Indonesia yang padat dan mudah dibaca di WhatsApp. Cantumkan jumlah order, total nilai rupiah, status dominan, order yang perlu perhatian, dan nomor order/resi penting. Jangan mengarang data.' },\n    { role: 'user', content: JSON.stringify(data) }\n  ]\n};\nreturn [{ json: { requestBody, orderData: data } }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000037",
+      "name": "Siapkan Ringkasan Order",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LM_STUDIO_BASE_URL + \"/chat/completions\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.LM_STUDIO_API_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000038",
+      "name": "LLM Ringkas Order",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2060,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const content = String($json.choices?.[0]?.message?.content || $json.choices?.[0]?.message?.reasoning_content || '').trim();\nreturn [{ json: { text: content || 'Belum ada data order untuk filter tersebut.' } }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000039",
+      "name": "Hasil Ringkasan Order",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2280,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "1233522196505651",
+        "recipientPhoneNumber": "={{$env.OWNER_PHONE}}",
+        "messageType": "text",
+        "textBody": "={{$json.text}}",
+        "additionalFields": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000040",
+      "name": "Kirim Ringkasan ke Owner",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        2500,
+        80
+      ],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "GWHOrCyNFPuKQ7zL",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000041",
+              "leftValue": "={{$json.action}}",
+              "rightValue": "help",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000042",
+      "name": "Tampilkan Bantuan?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1840,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "1233522196505651",
+        "recipientPhoneNumber": "={{$env.OWNER_PHONE}}",
+        "messageType": "text",
+        "textBody": "={{$json.text}}",
+        "additionalFields": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000043",
+      "name": "Kirim Bantuan Owner",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        2060,
+        280
+      ],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "GWHOrCyNFPuKQ7zL",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "00000000-0000-4000-8000-000000000044",
+      "name": "Abaikan Duplikat Owner",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2060,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.DB_API_URL + \"/rpc/receive_customer\"}}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_message_id: $json.message_id, p_phone: $json.phone, p_name: $json.name, p_text: $json.text, p_timestamp: $json.timestamp }) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000045",
+      "name": "DB Terima Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        920,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst value = Array.isArray(raw) ? (raw[0] ?? {}) : raw;\nreturn [{ json: value?.result && Object.keys(value).length === 1 ? value.result : value }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000046",
+      "name": "Hasil Customer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000047",
+              "leftValue": "={{$json.action}}",
+              "rightValue": "classify",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000048",
+      "name": "Perlu Klasifikasi?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        620
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "00000000-0000-4000-8000-000000000049",
+      "name": "Diam Menunggu Owner",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        820
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LM_STUDIO_BASE_URL + \"/embeddings\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.LM_STUDIO_API_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: [$json.message_text] }) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000050",
+      "name": "Embedding Pertanyaan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1600,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.QDRANT_URL + \"/collections/\" + $env.QDRANT_COLLECTION + \"/points/query\"}}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: $json.data?.[0]?.embedding, limit: 8, score_threshold: Number($env.QDRANT_SCORE_THRESHOLD || 0.72), with_payload: true }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000051",
+      "name": "Cari Knowledge Qdrant",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1840,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Hasil Customer').first().json;\nconst search = $input.first().json || {};\nconst points = search.result?.points || search.points || search.result || [];\nconst knowledge = (Array.isArray(points) ? points : []).map((p) => ({\n  score: p.score,\n  content_type: p.payload?.content_type || 'chat_qa',\n  question: p.payload?.question || '',\n  answer: p.payload?.answer || '',\n  text: p.payload?.text || '',\n  source: p.payload?.source || '',\n  asset_id: p.payload?.asset_id || '',\n  asset_description: p.payload?.asset_description || '',\n  asset_caption: p.payload?.asset_caption || '',\n  asset_path: p.payload?.asset_path || '',\n  original_file_name: p.payload?.original_file_name || '',\n  mime_type: p.payload?.mime_type || ''\n}));\n\nconst system = `Anda adalah admin WhatsApp toko. Selalu gunakan Bahasa Indonesia.\n\nATURAN KERAS:\n1. AUTO_REPLY hanya jika jawaban benar-benar didukung knowledge relevan atau data order pelanggan.\n2. Jangan mengarang harga, stok, kebijakan, status order, resi, tanggal, atau janji.\n3. Jika knowledge tidak menjawab, meragukan, konflik, atau membutuhkan keputusan owner, pilih ESCALATE.\n4. Saat ESCALATE jangan membuat balasan pelanggan. Ringkas kebutuhan dan tulis pertanyaan spesifik untuk owner.\n5. Balasan AUTO_REPLY harus meniru profil gaya owner, singkat, natural, dan tidak menyebut AI/vector database.\n6. Data order adalah sumber resmi untuk status pesanan pelanggan ini.\n7. Jika pelanggan meminta contoh/referensi gambar dan ada image_asset yang sangat relevan, pilih asset_id persis dari knowledge_relevan.\n8. Jangan memilih aset yang hanya mirip secara umum. Jika pelanggan meminta gambar tetapi tidak ada image_asset yang relevan, pilih ESCALATE.\n9. asset_id harus string kosong jika tidak perlu mengirim gambar.\n10. Output wajib mengikuti JSON schema.`;\n\nconst payload = {\n  profil_gaya_owner: ctx.style_profile,\n  nama_pelanggan: ctx.customer_name,\n  pesan_pelanggan: ctx.message_text,\n  riwayat_terbaru: ctx.recent_messages,\n  data_order: ctx.orders,\n  knowledge_relevan: knowledge\n};\n\nreturn [{ json: {\n  context: ctx,\n  knowledge,\n  requestBody: {\n    model: $env.LM_STUDIO_CHAT_MODEL,\n    temperature: 0.25,\n    max_tokens: 700,\n    messages: [\n      { role: 'system', content: system },\n      { role: 'user', content: JSON.stringify(payload) }\n    ],\n    response_format: {\n      type: 'json_schema',\n      json_schema: {\n        name: 'keputusan_admin_whatsapp',\n        strict: true,\n        schema: {\n          type: 'object',\n          additionalProperties: false,\n          properties: {\n            action: { type: 'string', enum: ['AUTO_REPLY', 'ESCALATE'] },\n            confidence: { type: 'number', minimum: 0, maximum: 1 },\n            reply: { type: 'string' },\n            needs_summary: { type: 'string' },\n            owner_question: { type: 'string' },\n            asset_id: { type: 'string' }\n          },\n          required: ['action', 'confidence', 'reply', 'needs_summary', 'owner_question', 'asset_id']\n        }\n      }\n    }\n  }\n} }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000052",
+      "name": "Siapkan Keputusan AI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LM_STUDIO_BASE_URL + \"/chat/completions\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.LM_STUDIO_API_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000053",
+      "name": "LLM Ambil Keputusan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2280,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Hasil Customer').first().json;\nconst prep = $('Siapkan Keputusan AI').first().json;\nlet content = $json.choices?.[0]?.message?.content || $json.choices?.[0]?.message?.reasoning_content || '';\nif (typeof content !== 'string') content = JSON.stringify(content);\ncontent = content.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();\nlet parsed;\ntry { parsed = JSON.parse(content); } catch { parsed = {}; }\n\nconst hasKnowledge = Array.isArray(prep.knowledge) && prep.knowledge.length > 0;\nconst hasOrders = Array.isArray(ctx.orders) && ctx.orders.length > 0;\nlet action = parsed.action === 'AUTO_REPLY' ? 'AUTO_REPLY' : 'ESCALATE';\nlet reply = String(parsed.reply || '').trim();\nif (action === 'AUTO_REPLY' && (!reply || (!hasKnowledge && !hasOrders))) action = 'ESCALATE';\nconst requestedAssetId = String(parsed.asset_id || '').trim();\nconst selectedAsset = prep.knowledge.find((entry) =>\n  entry.content_type === 'image_asset' &&\n  entry.asset_id &&\n  entry.asset_id === requestedAssetId &&\n  entry.asset_path &&\n  entry.mime_type.startsWith('image/')\n) || null;\n\nreturn [{ json: {\n  action,\n  confidence: Number(parsed.confidence || 0),\n  reply: action === 'AUTO_REPLY' ? reply : '',\n  needs_summary: String(parsed.needs_summary || ('Pelanggan menanyakan: ' + ctx.message_text)).trim(),\n  owner_question: String(parsed.owner_question || 'Mohon berikan jawaban yang boleh diteruskan ke pelanggan.').trim(),\n  customer_id: ctx.customer_id,\n  customer_message: ctx.message_text,\n  knowledge_used: prep.knowledge,\n  selected_asset: action === 'AUTO_REPLY' ? selectedAsset : null\n} }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000054",
+      "name": "Parse Keputusan AI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2500,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.DB_API_URL + \"/rpc/apply_decision\"}}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n        p_customer_id: $json.customer_id,\n        p_action: $json.action,\n        p_reply: $json.reply,\n        p_summary: $json.needs_summary,\n        p_owner_question: $json.owner_question,\n        p_confidence: $json.confidence,\n        p_source_context: { customer_message: $json.customer_message, knowledge_used: $json.knowledge_used, selected_asset: $json.selected_asset }\n      }) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000055",
+      "name": "Simpan Keputusan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2720,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst value = Array.isArray(raw) ? (raw[0] ?? {}) : raw;\nreturn [{ json: value?.result && Object.keys(value).length === 1 ? value.result : value }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000056",
+      "name": "Hasil Keputusan DB",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2940,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const db = $input.first().json;\nconst decision = $('Parse Keputusan AI').first().json;\nreturn [{ json: { ...db, selected_asset: decision.selected_asset || null } }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000057",
+      "name": "Gabungkan Aset Keputusan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3160,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000058",
+              "leftValue": "={{$json.action}}",
+              "rightValue": "auto_reply",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000059",
+      "name": "Balas Otomatis?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3380,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "1233522196505651",
+        "recipientPhoneNumber": "={{$json.customer_phone}}",
+        "messageType": "text",
+        "textBody": "={{$json.reply}}",
+        "additionalFields": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000060",
+      "name": "Kirim Balasan Otomatis",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        3620,
+        420
+      ],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "GWHOrCyNFPuKQ7zL",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.DB_API_URL + \"/rpc/log_delivery\"}}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_phone: $('Gabungkan Aset Keputusan').first().json.customer_phone, p_text: $('Gabungkan Aset Keputusan').first().json.reply, p_kind: 'auto_reply', p_ticket_code: null, p_provider_message_id: $json.messages?.[0]?.id || null }) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000061",
+      "name": "Log Balasan Otomatis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3860,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000062",
+              "leftValue": "={{String(Boolean($('Gabungkan Aset Keputusan').first().json.selected_asset?.asset_path))}}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000063",
+      "name": "Ada Aset Gambar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3860,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{$('Gabungkan Aset Keputusan').first().json.selected_asset.asset_path}}",
+        "options": {
+          "dataPropertyName": "data",
+          "fileName": "={{$('Gabungkan Aset Keputusan').first().json.selected_asset.original_file_name || 'referensi-gambar'}}",
+          "mimeType": "={{$('Gabungkan Aset Keputusan').first().json.selected_asset.mime_type}}"
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000064",
+      "name": "Baca Aset Gambar",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        4100,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "1233522196505651",
+        "recipientPhoneNumber": "={{$('Gabungkan Aset Keputusan').first().json.customer_phone}}",
+        "messageType": "image",
+        "mediaPath": "useMedian8n",
+        "mediaPropertyName": "data",
+        "additionalFields": {
+          "mediaCaption": "={{$('Gabungkan Aset Keputusan').first().json.selected_asset.asset_caption || $('Gabungkan Aset Keputusan').first().json.selected_asset.asset_description || ''}}"
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000065",
+      "name": "Kirim Aset Gambar",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        4340,
+        460
+      ],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "GWHOrCyNFPuKQ7zL",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.DB_API_URL + \"/rpc/log_delivery\"}}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_phone: $('Gabungkan Aset Keputusan').first().json.customer_phone, p_text: '[image] ' + ($('Gabungkan Aset Keputusan').first().json.selected_asset.asset_caption || $('Gabungkan Aset Keputusan').first().json.selected_asset.asset_description || ''), p_kind: 'auto_reply_asset', p_ticket_code: null, p_provider_message_id: $json.messages?.[0]?.id || null }) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000066",
+      "name": "Log Aset Gambar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4580,
+        460
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "00000000-0000-4000-8000-000000000067",
+      "name": "Selesai Tanpa Aset",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4100,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "1233522196505651",
+        "recipientPhoneNumber": "={{$env.OWNER_PHONE}}",
+        "messageType": "text",
+        "textBody": "={{$json.owner_message}}",
+        "additionalFields": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000068",
+      "name": "Eskalasi ke Owner",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        3620,
+        740
+      ],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "GWHOrCyNFPuKQ7zL",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.DB_API_URL + \"/rpc/log_delivery\"}}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_phone: $env.OWNER_PHONE, p_text: $('Gabungkan Aset Keputusan').first().json.owner_message, p_kind: 'escalation', p_ticket_code: $('Gabungkan Aset Keputusan').first().json.ticket_code, p_provider_message_id: $json.messages?.[0]?.id || null }) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000069",
+      "name": "Log Eskalasi",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3860,
+        740
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 03 — Impor Chat & Gaya Owner\n\n**Trigger:** `POST /webhook/admin/import-chat`\n\n**Keamanan:** header `x-import-key` wajib sama dengan `IMPORT_API_KEY`.\nAlur yang sama juga dipakai oleh form upload text pada bagian 05.\n\n**Cara kerja:**\n1. Parse file teks hasil **Export chat WhatsApp tanpa media**.\n2. Pisahkan pesan owner dan pelanggan.\n3. LM Studio menyusun profil gaya serta pasangan pertanyaan/jawaban yang jelas.\n4. Profil gaya dan metadata disimpan ke PostgreSQL.\n5. Pasangan Q&A dibuatkan embedding dan di-upsert ke Qdrant.\n\n**Hasil:** balasan otomatis berikutnya dapat meniru gaya owner dan memakai FAQ dari histori chat.",
+        "width": 440,
+        "height": 600,
+        "color": 6
+      },
+      "id": "00000000-0000-4000-8000-000000000098",
+      "name": "CATATAN 03 - Impor Chat",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        1450
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/import-chat",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000073",
+      "name": "Webhook Impor Chat",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        1700
+      ],
+      "webhookId": "00000000-0000-4000-8000-000000000072"
+    },
+    {
+      "parameters": {
+        "jsCode": "const headers = $json.headers || {};\nconst supplied = String(headers['x-import-key'] || '');\nreturn [{ json: {\n  ...$json,\n  body: { ...($json.body || {}), source_trigger: 'api' },\n  auth_state: supplied && supplied === String($env.IMPORT_API_KEY || '') ? 'authorized' : 'unauthorized'\n} }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000074",
+      "name": "Autorisasi Impor",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        1700
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000075",
+              "leftValue": "={{$json.auth_state}}",
+              "rightValue": "authorized",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000076",
+      "name": "Diizinkan?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        1700
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: \"unauthorized\" } }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000077",
+      "name": "Tolak Impor",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        680,
+        1880
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json || {};\nconst raw = String(body.export_text || body.chat_export || '');\nconst ownerName = String(body.owner_name || $env.OWNER_NAME || 'Owner').trim();\nconst sourceTrigger = String(body.source_trigger || 'api');\nif (!raw.trim()) throw new Error('Field export_text wajib berisi isi file ekspor WhatsApp.');\n\nconst entries = [];\nconst lines = raw.replace(/\\r\\n/g, '\\n').split('\\n');\nconst linePattern = /^\\[?(\\d{1,2}\\/\\d{1,2}\\/\\d{2,4}),?\\s+(\\d{1,2}[.:]\\d{2}(?::\\d{2})?)\\]?\\s*(?:[-–]\\s*)?([^:]+):\\s*(.*)$/;\nfor (const line of lines) {\n  const match = line.match(linePattern);\n  if (match) {\n    entries.push({ date: match[1], time: match[2], sender: match[3].trim(), text: match[4].trim() });\n  } else if (entries.length && line.trim()) {\n    entries[entries.length - 1].text += '\\n' + line.trim();\n  }\n}\n\nif (!entries.length) throw new Error('Format ekspor tidak dikenali. Gunakan file .txt hasil Export chat WhatsApp tanpa media.');\nconst ownerLower = ownerName.toLowerCase();\nconst ownerMessages = entries.filter((e) => e.sender.toLowerCase() === ownerLower && e.text).slice(-350);\nif (!ownerMessages.length) throw new Error('Nama owner tidak ditemukan di ekspor. Kirim owner_name yang persis sama dengan nama pada log.');\n\nconst excerptEntries = entries.slice(-700);\nlet excerpt = excerptEntries.map((e) => e.sender + ': ' + e.text).join('\\n');\nif (excerpt.length > 60000) excerpt = excerpt.slice(-60000);\nlet ownerSample = ownerMessages.map((e) => e.text).join('\\n---\\n');\nif (ownerSample.length > 30000) ownerSample = ownerSample.slice(-30000);\n\nreturn [{ json: {\n  owner_name: ownerName,\n  total_entries: entries.length,\n  owner_message_count: ownerMessages.length,\n  excerpt,\n  owner_sample: ownerSample,\n  source_trigger: sourceTrigger\n} }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000078",
+      "name": "Parse Ekspor WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        1620
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst system = `Anda menganalisis log percakapan WhatsApp toko dalam Bahasa Indonesia.\nTugas:\n1. Buat profil gaya chat owner yang operasional: sapaan, panjang kalimat, pilihan kata, emoji, tanda baca, cara menyatakan kepastian/ketidakpastian, dan hal yang harus dihindari.\n2. Ekstrak maksimal 100 pasangan pertanyaan pelanggan dan jawaban owner yang benar-benar tampak dalam log.\n3. Jangan mengarang FAQ. Abaikan obrolan pribadi, informasi sensitif, nomor rekening, OTP, alamat lengkap, dan pasangan tanpa jawaban jelas.\n4. Rapikan pertanyaan agar dapat dicari secara semantik, tetapi pertahankan makna jawaban owner.\n5. Output wajib sesuai JSON schema.`;\nreturn [{ json: {\n  stats: data,\n  requestBody: {\n    model: $env.LM_STUDIO_CHAT_MODEL,\n    temperature: 0.15,\n    max_tokens: 5000,\n    messages: [\n      { role: 'system', content: system },\n      { role: 'user', content: JSON.stringify({ owner_name: data.owner_name, contoh_pesan_owner: data.owner_sample, percakapan: data.excerpt }) }\n    ],\n    response_format: {\n      type: 'json_schema',\n      json_schema: {\n        name: 'analisis_chat_owner', strict: true,\n        schema: {\n          type: 'object', additionalProperties: false,\n          properties: {\n            style_profile: { type: 'string' },\n            qa_pairs: {\n              type: 'array', maxItems: 100,\n              items: {\n                type: 'object', additionalProperties: false,\n                properties: {\n                  question: { type: 'string' },\n                  answer: { type: 'string' },\n                  tags: { type: 'array', items: { type: 'string' } }\n                },\n                required: ['question', 'answer', 'tags']\n              }\n            }\n          },\n          required: ['style_profile', 'qa_pairs']\n        }\n      }\n    }\n  }\n} }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000079",
+      "name": "Siapkan Analisis Style",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        1620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LM_STUDIO_BASE_URL + \"/chat/completions\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.LM_STUDIO_API_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000080",
+      "name": "LLM Analisis Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        1620
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let content = $json.choices?.[0]?.message?.content || $json.choices?.[0]?.message?.reasoning_content || '';\ncontent = String(content).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();\nlet parsed;\ntry { parsed = JSON.parse(content); } catch { throw new Error('Model tidak menghasilkan JSON analisis chat yang valid.'); }\nconst pairs = (Array.isArray(parsed.qa_pairs) ? parsed.qa_pairs : [])\n  .map((p) => ({ question: String(p.question || '').trim(), answer: String(p.answer || '').trim(), tags: Array.isArray(p.tags) ? p.tags.map(String) : [] }))\n  .filter((p) => p.question && p.answer)\n  .slice(0, 100);\nconst stats = $('Siapkan Analisis Style').first().json.stats;\nreturn [{ json: {\n  style_profile: String(parsed.style_profile || '').trim(),\n  qa_pairs: pairs,\n  pair_count: pairs.length,\n  source_stats: { total_entries: stats.total_entries, owner_message_count: stats.owner_message_count, owner_name: stats.owner_name, source_trigger: stats.source_trigger }\n} }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000081",
+      "name": "Parse Analisis Style",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        1620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.DB_API_URL + \"/rpc/save_style_and_knowledge\"}}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_style_profile: $json.style_profile, p_pairs: $json.qa_pairs, p_source_stats: $json.source_stats }) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000082",
+      "name": "Simpan Style dan Knowledge",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1560,
+        1620
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const analysis = $('Parse Analisis Style').first().json;\nconst saved = $input.first().json;\nreturn [{ json: { ...analysis, database: saved } }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000083",
+      "name": "Gabungkan Hasil Impor",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        1620
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000084",
+              "leftValue": "={{$json.pair_count}}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000085",
+      "name": "Ada Pasangan QA?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2000,
+        1620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LM_STUDIO_BASE_URL + \"/embeddings\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.LM_STUDIO_API_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: $json.qa_pairs.map((p) => 'Pertanyaan: ' + p.question + '\\nJawaban: ' + p.answer) }) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000086",
+      "name": "Embedding Knowledge Impor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2220,
+        1540
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { randomUUID } = require('crypto');\nconst analysis = $('Parse Analisis Style').first().json;\nconst vectors = $json.data || [];\nif (vectors.length !== analysis.qa_pairs.length) throw new Error('Jumlah embedding tidak sama dengan jumlah pasangan knowledge.');\nconst points = analysis.qa_pairs.map((pair, index) => ({\n  id: randomUUID(),\n  vector: vectors[index].embedding,\n  payload: {\n    content_type: 'chat_qa',\n    question: pair.question,\n    answer: pair.answer,\n    text: 'Pertanyaan: ' + pair.question + '\\nJawaban: ' + pair.answer,\n    tags: pair.tags,\n    source: 'whatsapp_chat_export',\n    owner_name: analysis.source_stats.owner_name,\n    imported_at: new Date().toISOString()\n  }\n}));\nreturn [{ json: { points } }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000087",
+      "name": "Buat Points Impor",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2440,
+        1540
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{$env.QDRANT_URL + \"/collections/\" + $env.QDRANT_COLLECTION + \"/points?wait=true\"}}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000088",
+      "name": "Upsert Knowledge Impor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2660,
+        1540
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000089",
+              "leftValue": "={{$('Parse Analisis Style').first().json.source_stats.source_trigger}}",
+              "rightValue": "form_upload",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000090",
+      "name": "Impor Berasal dari Form?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2880,
+        1540
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const analysis = $('Parse Analisis Style').first().json;\nreturn [{ json: {\n  ok: true,\n  upload_type: 'text',\n  owner_name: analysis.source_stats.owner_name,\n  style_updated: true,\n  knowledge_count: analysis.pair_count,\n  message: 'Chat WhatsApp berhasil diproses dan knowledge Qdrant diperbarui.'\n} }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000091",
+      "name": "Upload Chat Selesai",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        1460
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ ({ ok: true, style_updated: true, knowledge_count: $('Parse Analisis Style').first().json.pair_count, qdrant: $json.status || 'completed' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000092",
+      "name": "Impor Berhasil",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        3120,
+        1620
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000093",
+              "leftValue": "={{$json.source_stats.source_trigger}}",
+              "rightValue": "form_upload",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000094",
+      "name": "Tanpa QA Berasal dari Form?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2220,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  ok: true,\n  upload_type: 'text',\n  owner_name: $json.source_stats.owner_name,\n  style_updated: true,\n  knowledge_count: 0,\n  message: 'Profil gaya tersimpan, tetapi tidak ditemukan pasangan tanya-jawab yang cukup jelas.'\n} }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000095",
+      "name": "Upload Chat Tanpa QA Selesai",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2460,
+        1720
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ ({ ok: true, style_updated: true, knowledge_count: 0, note: 'Profil gaya tersimpan, tetapi tidak ada pasangan tanya-jawab yang cukup jelas.' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000096",
+      "name": "Impor Tanpa QA",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        2460,
+        1840
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 04 — Sinkronisasi Order\n\n**Trigger:** `POST /webhook/admin/orders/upsert`\n\n**Keamanan:** header `x-import-key` wajib sama dengan `IMPORT_API_KEY`.\n\nPayload order divalidasi lalu dikirim ke RPC database. Operasinya **idempoten berdasarkan nomor order**: nomor baru dibuat, nomor yang sudah ada diperbarui.\n\nData ini dipakai router utama untuk menjawab status pesanan dan perintah owner `/pesanan`.",
+        "width": 440,
+        "height": 460,
+        "color": 2
+      },
+      "id": "00000000-0000-4000-8000-000000000109",
+      "name": "CATATAN 04 - Sinkronisasi Order",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        2400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/orders/upsert",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000100",
+      "name": "Webhook Upsert Order",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        2600
+      ],
+      "webhookId": "00000000-0000-4000-8000-000000000099"
+    },
+    {
+      "parameters": {
+        "jsCode": "const headers = $json.headers || {};\nconst supplied = String(headers['x-import-key'] || '');\nconst body = $json.body || {};\nconst authorized = supplied && supplied === String($env.IMPORT_API_KEY || '');\nreturn [{ json: { auth_state: authorized ? 'authorized' : 'unauthorized', body } }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000101",
+      "name": "Autorisasi Order",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        2600
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000102",
+              "leftValue": "={{$json.auth_state}}",
+              "rightValue": "authorized",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000103",
+      "name": "Order Diizinkan?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        2600
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: \"unauthorized\" } }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000104",
+      "name": "Tolak Order",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        680,
+        2760
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.DB_API_URL + \"/rpc/upsert_order\"}}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n        p_order_number: $json.body.order_number,\n        p_customer_phone: $json.body.customer_phone,\n        p_customer_name: $json.body.customer_name || null,\n        p_status: $json.body.status || 'baru',\n        p_items: $json.body.items || [],\n        p_subtotal: Number($json.body.subtotal || 0),\n        p_shipping_cost: Number($json.body.shipping_cost || 0),\n        p_shipping_address: $json.body.shipping_address || null,\n        p_tracking_number: $json.body.tracking_number || null,\n        p_notes: $json.body.notes || null,\n        p_ordered_at: $json.body.ordered_at || new Date().toISOString()\n      }) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000105",
+      "name": "DB Upsert Order",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        680,
+        2520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst value = Array.isArray(raw) ? (raw[0] ?? {}) : raw;\nreturn [{ json: value?.result && Object.keys(value).length === 1 ? value.result : value }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000106",
+      "name": "Hasil Upsert Order",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        2520
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000107",
+      "name": "Jawab Upsert Order",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1120,
+        2520
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 05 — Upload Knowledge & Aset Gambar\n\n**Form produksi:** `/form/admin-upload-knowledge`\n**API multipart:** `POST /webhook/admin/upload-knowledge`\n\n**Keamanan:** form memerlukan login n8n; API memerlukan header `x-import-key`.\n\n**Tipe text (.txt):**\n1. Membaca Export chat WhatsApp.\n2. Nama owner default **Savior** dan dapat diedit agar sama persis dengan log.\n3. Menggunakan alur 03 untuk membuat profil gaya serta Q&A di Qdrant.\n4. File mentah tidak disimpan setelah selesai diproses.\n\n**Tipe image (JPG/PNG/WEBP):**\n1. Deskripsi dan tag divalidasi.\n2. File asli disimpan persisten di volume `n8n_data/assets`.\n3. Embedding deskripsi dan metadata/path file disimpan sebagai `image_asset` di Qdrant.\n4. Router dapat memilih aset relevan, meng-upload-nya ke WhatsApp, lalu mengirimkannya ke pelanggan.\n\nUkuran file maksimal **15 MB**. Deskripsi gambar harus spesifik agar pencarian aset akurat.",
+        "width": 500,
+        "height": 720,
+        "color": 1
+      },
+      "id": "00000000-0000-4000-8000-000000000133",
+      "name": "CATATAN 05 - Upload Knowledge dan Aset",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        3300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "n8nUserAuth",
+        "formTitle": "Upload Knowledge WhatsApp Savior",
+        "formDescription": "Upload ekspor chat WhatsApp (.txt) atau aset gambar referensi (.jpg, .png, .webp). Hanya pengguna n8n yang sudah login yang dapat membuka form ini.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Tipe data",
+              "fieldName": "data_type",
+              "fieldType": "radio",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "text"
+                  },
+                  {
+                    "option": "image"
+                  }
+                ]
+              },
+              "defaultValue": "text",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Nama business owner pada chat",
+              "fieldName": "owner_name",
+              "fieldType": "text",
+              "defaultValue": "Savior",
+              "placeholder": "Harus sama dengan nama pengirim di file chat"
+            },
+            {
+              "fieldLabel": "Deskripsi penggunaan aset",
+              "fieldName": "description",
+              "fieldType": "textarea",
+              "placeholder": "Wajib untuk gambar. Contoh: referensi kaos panitia warna tosca dengan sablon depan-belakang"
+            },
+            {
+              "fieldLabel": "Tag",
+              "fieldName": "tags",
+              "fieldType": "text",
+              "placeholder": "Pisahkan dengan koma, contoh: kaos, panitia, tosca"
+            },
+            {
+              "fieldLabel": "File",
+              "fieldName": "file",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".txt, .jpg, .jpeg, .png, .webp",
+              "requiredField": true
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {
+          "path": "admin-upload-knowledge",
+          "buttonLabel": "Upload dan proses",
+          "appendAttribution": false,
+          "useWorkflowTimezone": true
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000111",
+      "name": "Form Upload Knowledge",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        3500
+      ],
+      "webhookId": "00000000-0000-4000-8000-000000000110"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/upload-knowledge",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000113",
+      "name": "Webhook API Upload Knowledge",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        3800
+      ],
+      "webhookId": "00000000-0000-4000-8000-000000000112"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst headers = item.json.headers || {};\nconst supplied = String(headers['x-import-key'] || '');\nreturn [{\n  json: {\n    ...item.json,\n    body: { ...(item.json.body || {}), source_trigger: 'api_upload' },\n    auth_state: supplied && supplied === String($env.IMPORT_API_KEY || '') ? 'authorized' : 'unauthorized'\n  },\n  binary: item.binary\n}];"
+      },
+      "id": "00000000-0000-4000-8000-000000000114",
+      "name": "Autorisasi API Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        3800
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000115",
+              "leftValue": "={{$json.auth_state}}",
+              "rightValue": "authorized",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000116",
+      "name": "API Upload Diizinkan?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        3800
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: \"unauthorized\" } }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000117",
+      "name": "Tolak API Upload",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        720,
+        3920
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { randomUUID } = require('crypto');\nconst item = $input.first();\nconst body = item.json.body || item.json || {};\nconst dataType = String(body.data_type || '').trim().toLowerCase();\nif (!['text', 'image'].includes(dataType)) {\n  throw new Error('Tipe data harus text atau image.');\n}\n\nconst binaryKeys = Object.keys(item.binary || {});\nconst sourceKey = item.binary?.file ? 'file' : binaryKeys[0];\nconst uploaded = sourceKey ? item.binary[sourceKey] : null;\nif (!uploaded) throw new Error('File wajib dipilih.');\n\nconst originalFileName = String(uploaded.fileName || 'upload').replace(/[\\r\\n]/g, '').slice(0, 180);\nconst extension = String(uploaded.fileExtension || originalFileName.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '');\nconst mimeType = String(uploaded.mimeType || '').toLowerCase();\nconst allowedText = extension === 'txt' && (!mimeType || mimeType.startsWith('text/'));\nconst allowedImage = ['jpg', 'jpeg', 'png', 'webp'].includes(extension) && ['image/jpeg', 'image/png', 'image/webp'].includes(mimeType);\n\nif (dataType === 'text' && !allowedText) {\n  throw new Error('Untuk tipe text, upload file .txt hasil Export chat WhatsApp.');\n}\nif (dataType === 'image' && !allowedImage) {\n  throw new Error('Untuk tipe image, format yang diizinkan hanya JPG, PNG, atau WEBP.');\n}\n\nconst parseSize = (value) => {\n  if (typeof value === 'number') return value;\n  const match = String(value || '').trim().match(/^([\\d.]+)\\s*(b|kb|mb|gb)?$/i);\n  if (!match) return 0;\n  const scale = { b: 1, kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3 };\n  return Number(match[1]) * (scale[(match[2] || 'b').toLowerCase()] || 1);\n};\nconst fileSizeBytes = parseSize(uploaded.fileSize);\nif (fileSizeBytes > 15 * 1024 * 1024) throw new Error('Ukuran file maksimal 15 MB.');\n\nconst description = String(body.description || '').trim();\nif (dataType === 'image' && description.length < 8) {\n  throw new Error('Deskripsi penggunaan gambar wajib diisi minimal 8 karakter agar aset dapat dicari secara semantik.');\n}\n\nconst tags = [...new Set(String(body.tags || '').split(',').map((tag) => tag.trim().toLowerCase()).filter(Boolean))].slice(0, 20);\nconst assetId = randomUUID();\nconst storedExtension = extension === 'jpeg' ? 'jpg' : extension;\n\nreturn [{\n  json: {\n    upload_type: dataType,\n    owner_name: String(body.owner_name || 'Savior').trim() || 'Savior',\n    description,\n    tags,\n    original_file_name: originalFileName,\n    file_extension: storedExtension,\n    mime_type: mimeType || (dataType === 'text' ? 'text/plain' : 'application/octet-stream'),\n    file_size: uploaded.fileSize || null,\n    asset_id: assetId,\n    asset_path: '/home/node/.n8n/assets/' + assetId + '.' + storedExtension,\n    submitted_at: body.submittedAt || new Date().toISOString(),\n    source_trigger: String(body.source_trigger || 'form_upload')\n  },\n  binary: { file: uploaded }\n}];"
+      },
+      "id": "00000000-0000-4000-8000-000000000118",
+      "name": "Validasi File Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        3500
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000119",
+              "leftValue": "={{$json.upload_type}}",
+              "rightValue": "text",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000120",
+      "name": "Upload Chat Text?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        3500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "file",
+        "destinationKey": "export_text",
+        "options": {
+          "encoding": "utf8",
+          "stripBOM": true,
+          "keepSource": "json"
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000121",
+      "name": "Baca Isi File Chat",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        3380
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  export_text: String($json.export_text || ''),\n  owner_name: String($json.owner_name || 'Savior').trim() || 'Savior',\n  source_trigger: String($json.source_trigger || 'form_upload')\n} }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000122",
+      "name": "Siapkan Upload Chat",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        3380
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst meta = item.json;\nreturn [{\n  json: {\n    ...meta,\n    embedding_text: 'Aset gambar referensi WhatsApp. Deskripsi: ' + meta.description +\n      (meta.tags.length ? '\\nTag: ' + meta.tags.join(', ') : '') +\n      '\\nNama file: ' + meta.original_file_name\n  },\n  binary: item.binary\n}];"
+      },
+      "id": "00000000-0000-4000-8000-000000000123",
+      "name": "Siapkan Metadata Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        3640
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{$json.asset_path}}",
+        "dataPropertyName": "file",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000124",
+      "name": "Simpan Aset ke Volume n8n",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        3640
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LM_STUDIO_BASE_URL + \"/embeddings\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.LM_STUDIO_API_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $env.LM_STUDIO_EMBEDDING_MODEL, input: [$json.embedding_text] }) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000125",
+      "name": "Embedding Deskripsi Aset",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1200,
+        3640
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const meta = $('Siapkan Metadata Upload').first().json;\nconst vector = $json.data?.[0]?.embedding;\nif (!Array.isArray(vector) || vector.length === 0) {\n  throw new Error('Embedding aset gambar gagal dibuat.');\n}\nreturn [{ json: {\n  points: [{\n    id: meta.asset_id,\n    vector,\n    payload: {\n      content_type: 'image_asset',\n      asset_id: meta.asset_id,\n      asset_description: meta.description,\n      asset_caption: meta.description.slice(0, 900),\n      asset_path: meta.asset_path,\n      original_file_name: meta.original_file_name,\n      mime_type: meta.mime_type,\n      file_size: meta.file_size,\n      tags: meta.tags,\n      text: 'Aset gambar referensi: ' + meta.description + (meta.tags.length ? '\\nTag: ' + meta.tags.join(', ') : ''),\n      source: 'admin_upload_form',\n      imported_at: new Date().toISOString()\n    }\n  }]\n} }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000126",
+      "name": "Buat Point Aset Gambar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        3640
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{$env.QDRANT_URL + \"/collections/\" + $env.QDRANT_COLLECTION + \"/points?wait=true\"}}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000127",
+      "name": "Upsert Aset ke Qdrant",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1680,
+        3640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000128",
+              "leftValue": "={{$('Siapkan Metadata Upload').first().json.source_trigger}}",
+              "rightValue": "form_upload",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000129",
+      "name": "Upload Gambar dari Form?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        3640
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const meta = $('Siapkan Metadata Upload').first().json;\nreturn [{ json: {\n  ok: true,\n  upload_type: 'image',\n  asset_id: meta.asset_id,\n  original_file_name: meta.original_file_name,\n  description: meta.description,\n  tags: meta.tags,\n  stored_in: 'n8n_volume_and_qdrant',\n  message: 'Aset gambar berhasil disimpan dan dapat dipilih oleh bot saat relevan.'\n} }];"
+      },
+      "id": "00000000-0000-4000-8000-000000000130",
+      "name": "Upload Gambar Selesai",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        3560
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ ({\n      ok: true,\n      upload_type: 'image',\n      asset_id: $('Siapkan Metadata Upload').first().json.asset_id,\n      original_file_name: $('Siapkan Metadata Upload').first().json.original_file_name,\n      description: $('Siapkan Metadata Upload').first().json.description,\n      tags: $('Siapkan Metadata Upload').first().json.tags,\n      stored_in: 'n8n_volume_and_qdrant'\n    }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000131",
+      "name": "API Upload Gambar Berhasil",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        2160,
+        3720
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000d0001",
+      "name": "Dashboard Kirim",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        4320
+      ],
+      "webhookId": "6f1d8a52-2b1c-4c7e-9a43-d0a5b0000001",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dashboard-send",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000d0002",
+      "name": "Validasi Dashboard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        4320
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "jsCode": "const secret = $env.DASHBOARD_SEND_SECRET || '';\nconst headers = $json.headers || {};\nif (!secret || headers['x-dashboard-secret'] !== secret) throw new Error('unauthorized');\nconst to = String($json.body?.to || '').replace(/\\D/g, '');\nconst text = String($json.body?.text || '').trim();\nif (!/^62\\d{8,13}$/.test(to) || !text) throw new Error('invalid_payload');\nreturn [{ json: { to, text } }];"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000d0003",
+      "name": "Kirim dari Dashboard",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        4320
+      ],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "GWHOrCyNFPuKQ7zL",
+          "name": "WhatsApp account"
+        }
+      },
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "1233522196505651",
+        "recipientPhoneNumber": "={{$json.to}}",
+        "messageType": "text",
+        "textBody": "={{$json.text}}",
+        "additionalFields": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000d0004",
+      "name": "Balas Dashboard",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        720,
+        4320
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ provider_message_id: $json.messages?.[0]?.id || null }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000d0005",
+      "name": "Balas Dashboard Gagal",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        720,
+        4520
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: { message: String($json.error?.description || $json.error?.message || $json.error || 'gagal kirim') } }) }}",
+        "options": {
+          "responseCode": 502
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Jalankan Setup": {
+      "main": [
+        [
+          {
+            "node": "Cek Collection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cek Collection": {
+      "main": [
+        [
+          {
+            "node": "Sudah Ada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sudah Ada?": {
+      "main": [
+        [
+          {
+            "node": "Collection Sudah Siap",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tes Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tes Embedding": {
+      "main": [
+        [
+          {
+            "node": "Baca Dimensi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baca Dimensi": {
+      "main": [
+        [
+          {
+            "node": "Buat Collection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verifikasi Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validasi Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validasi Token": {
+      "main": [
+        [
+          {
+            "node": "Jawab Verifikasi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Pesan WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Normalisasi dan Verifikasi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalisasi dan Verifikasi": {
+      "main": [
+        [
+          {
+            "node": "Event Pesan?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Pesan?": {
+      "main": [
+        [
+          {
+            "node": "Dari Owner?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Abaikan Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dari Owner?": {
+      "main": [
+        [
+          {
+            "node": "DB Terima Owner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DB Terima Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB Terima Owner": {
+      "main": [
+        [
+          {
+            "node": "Hasil Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hasil Owner": {
+      "main": [
+        [
+          {
+            "node": "Balasan Tiket?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Balasan Tiket?": {
+      "main": [
+        [
+          {
+            "node": "Teruskan Jawaban Owner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Perintah Pesanan?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Teruskan Jawaban Owner": {
+      "main": [
+        [
+          {
+            "node": "Selesaikan Tiket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Selesaikan Tiket": {
+      "main": [
+        [
+          {
+            "node": "Hasil Tiket Selesai",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hasil Tiket Selesai": {
+      "main": [
+        [
+          {
+            "node": "Embedding Jawaban Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embedding Jawaban Owner": {
+      "main": [
+        [
+          {
+            "node": "Point Jawaban Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Point Jawaban Owner": {
+      "main": [
+        [
+          {
+            "node": "Upsert Knowledge Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perintah Pesanan?": {
+      "main": [
+        [
+          {
+            "node": "Siapkan Ringkasan Order",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tampilkan Bantuan?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siapkan Ringkasan Order": {
+      "main": [
+        [
+          {
+            "node": "LLM Ringkas Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Ringkas Order": {
+      "main": [
+        [
+          {
+            "node": "Hasil Ringkasan Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hasil Ringkasan Order": {
+      "main": [
+        [
+          {
+            "node": "Kirim Ringkasan ke Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tampilkan Bantuan?": {
+      "main": [
+        [
+          {
+            "node": "Kirim Bantuan Owner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Abaikan Duplikat Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB Terima Customer": {
+      "main": [
+        [
+          {
+            "node": "Hasil Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hasil Customer": {
+      "main": [
+        [
+          {
+            "node": "Perlu Klasifikasi?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perlu Klasifikasi?": {
+      "main": [
+        [
+          {
+            "node": "Embedding Pertanyaan",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Diam Menunggu Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embedding Pertanyaan": {
+      "main": [
+        [
+          {
+            "node": "Cari Knowledge Qdrant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cari Knowledge Qdrant": {
+      "main": [
+        [
+          {
+            "node": "Siapkan Keputusan AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siapkan Keputusan AI": {
+      "main": [
+        [
+          {
+            "node": "LLM Ambil Keputusan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Ambil Keputusan": {
+      "main": [
+        [
+          {
+            "node": "Parse Keputusan AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Keputusan AI": {
+      "main": [
+        [
+          {
+            "node": "Simpan Keputusan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simpan Keputusan": {
+      "main": [
+        [
+          {
+            "node": "Hasil Keputusan DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hasil Keputusan DB": {
+      "main": [
+        [
+          {
+            "node": "Gabungkan Aset Keputusan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gabungkan Aset Keputusan": {
+      "main": [
+        [
+          {
+            "node": "Balas Otomatis?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Balas Otomatis?": {
+      "main": [
+        [
+          {
+            "node": "Kirim Balasan Otomatis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Eskalasi ke Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kirim Balasan Otomatis": {
+      "main": [
+        [
+          {
+            "node": "Log Balasan Otomatis",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ada Aset Gambar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ada Aset Gambar?": {
+      "main": [
+        [
+          {
+            "node": "Baca Aset Gambar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Selesai Tanpa Aset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baca Aset Gambar": {
+      "main": [
+        [
+          {
+            "node": "Kirim Aset Gambar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kirim Aset Gambar": {
+      "main": [
+        [
+          {
+            "node": "Log Aset Gambar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eskalasi ke Owner": {
+      "main": [
+        [
+          {
+            "node": "Log Eskalasi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Impor Chat": {
+      "main": [
+        [
+          {
+            "node": "Autorisasi Impor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Autorisasi Impor": {
+      "main": [
+        [
+          {
+            "node": "Diizinkan?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Diizinkan?": {
+      "main": [
+        [
+          {
+            "node": "Parse Ekspor WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tolak Impor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Ekspor WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Siapkan Analisis Style",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siapkan Analisis Style": {
+      "main": [
+        [
+          {
+            "node": "LLM Analisis Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Analisis Chat": {
+      "main": [
+        [
+          {
+            "node": "Parse Analisis Style",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Analisis Style": {
+      "main": [
+        [
+          {
+            "node": "Simpan Style dan Knowledge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simpan Style dan Knowledge": {
+      "main": [
+        [
+          {
+            "node": "Gabungkan Hasil Impor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gabungkan Hasil Impor": {
+      "main": [
+        [
+          {
+            "node": "Ada Pasangan QA?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ada Pasangan QA?": {
+      "main": [
+        [
+          {
+            "node": "Embedding Knowledge Impor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tanpa QA Berasal dari Form?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embedding Knowledge Impor": {
+      "main": [
+        [
+          {
+            "node": "Buat Points Impor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buat Points Impor": {
+      "main": [
+        [
+          {
+            "node": "Upsert Knowledge Impor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Knowledge Impor": {
+      "main": [
+        [
+          {
+            "node": "Impor Berasal dari Form?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Impor Berasal dari Form?": {
+      "main": [
+        [
+          {
+            "node": "Upload Chat Selesai",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Impor Berhasil",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tanpa QA Berasal dari Form?": {
+      "main": [
+        [
+          {
+            "node": "Upload Chat Tanpa QA Selesai",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Impor Tanpa QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Upsert Order": {
+      "main": [
+        [
+          {
+            "node": "Autorisasi Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Autorisasi Order": {
+      "main": [
+        [
+          {
+            "node": "Order Diizinkan?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order Diizinkan?": {
+      "main": [
+        [
+          {
+            "node": "DB Upsert Order",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tolak Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB Upsert Order": {
+      "main": [
+        [
+          {
+            "node": "Hasil Upsert Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hasil Upsert Order": {
+      "main": [
+        [
+          {
+            "node": "Jawab Upsert Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form Upload Knowledge": {
+      "main": [
+        [
+          {
+            "node": "Validasi File Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook API Upload Knowledge": {
+      "main": [
+        [
+          {
+            "node": "Autorisasi API Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Autorisasi API Upload": {
+      "main": [
+        [
+          {
+            "node": "API Upload Diizinkan?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Upload Diizinkan?": {
+      "main": [
+        [
+          {
+            "node": "Validasi File Upload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tolak API Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validasi File Upload": {
+      "main": [
+        [
+          {
+            "node": "Upload Chat Text?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Chat Text?": {
+      "main": [
+        [
+          {
+            "node": "Baca Isi File Chat",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Siapkan Metadata Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baca Isi File Chat": {
+      "main": [
+        [
+          {
+            "node": "Siapkan Upload Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siapkan Upload Chat": {
+      "main": [
+        [
+          {
+            "node": "Parse Ekspor WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siapkan Metadata Upload": {
+      "main": [
+        [
+          {
+            "node": "Simpan Aset ke Volume n8n",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simpan Aset ke Volume n8n": {
+      "main": [
+        [
+          {
+            "node": "Embedding Deskripsi Aset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embedding Deskripsi Aset": {
+      "main": [
+        [
+          {
+            "node": "Buat Point Aset Gambar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buat Point Aset Gambar": {
+      "main": [
+        [
+          {
+            "node": "Upsert Aset ke Qdrant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Aset ke Qdrant": {
+      "main": [
+        [
+          {
+            "node": "Upload Gambar dari Form?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Gambar dari Form?": {
+      "main": [
+        [
+          {
+            "node": "Upload Gambar Selesai",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "API Upload Gambar Berhasil",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dashboard Kirim": {
+      "main": [
+        [
+          {
+            "node": "Validasi Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validasi Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Kirim dari Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Balas Dashboard Gagal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kirim dari Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Balas Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Balas Dashboard Gagal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jakarta",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": true
+  },
+  "versionId": "00000000-0000-4000-8000-000000000135",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

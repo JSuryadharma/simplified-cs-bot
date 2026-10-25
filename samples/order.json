@@ -1,0 +1,20 @@
+{
+  "order_number": "DEMO-1003",
+  "customer_phone": "628111111111",
+  "customer_name": "Pelanggan Demo",
+  "status": "diproses",
+  "items": [
+    {
+      "name": "Kopi Arabika 250g",
+      "qty": 2,
+      "price": 85000
+    }
+  ],
+  "subtotal": 170000,
+  "shipping_cost": 15000,
+  "shipping_address": "Jakarta",
+  "tracking_number": null,
+  "notes": "Kirim sore hari",
+  "ordered_at": "2026-07-18T09:00:00+07:00"
+}
+

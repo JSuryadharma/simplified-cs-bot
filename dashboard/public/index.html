@@ -1,0 +1,1009 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard Admin WhatsApp</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --panel-2: #f9fafb;
+    --ink: #111827;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --accent: #0f766e;
+    --accent-ink: #ffffff;
+    --accent-soft: #e6f4f2;
+    --amber: #b45309;
+    --amber-soft: #fef3c7;
+    --blue: #1d4ed8;
+    --blue-soft: #e0e7ff;
+    --green: #047857;
+    --green-soft: #d1fae5;
+    --red: #b91c1c;
+    --red-soft: #fee2e2;
+    --bubble-in: #ffffff;
+    --bubble-out: #dcf8c6;
+    --chat-bg: #efeae2;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+  }
+  button { font: inherit; }
+
+  /* Top bar */
+  .topbar {
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 20px; height: 56px; flex: none;
+    background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; white-space: nowrap; }
+  .brand small { color: var(--muted); font-weight: 500; margin-left: 6px; }
+  .tabs { display: flex; gap: 4px; margin-left: 12px; }
+  .tab {
+    border: 0; background: none; padding: 8px 12px; border-radius: 8px;
+    color: var(--muted); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .tab:hover { background: var(--panel-2); color: var(--ink); }
+  .tab.active { background: var(--accent-soft); color: var(--accent); }
+  .tab .count { background: var(--amber); color: #fff; border-radius: 999px; font-size: 11px; padding: 1px 7px; }
+  .tab .count:empty { display: none; }
+  .spacer { flex: 1; }
+  .status { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+  .status.off .dot { background: var(--red); }
+  .status.off { color: var(--red); font-weight: 600; }
+  .icon-btn {
+    border: 1px solid var(--line); background: var(--panel); border-radius: 8px;
+    padding: 6px 10px; cursor: pointer; color: var(--ink);
+  }
+  .icon-btn:hover { background: var(--panel-2); }
+
+  main { flex: 1; min-height: 0; }
+  .view { display: none; height: 100%; }
+  .view.active { display: flex; }
+
+  /* Tickets: inbox layout */
+  .inbox { display: grid; grid-template-columns: 340px 1fr; width: 100%; height: 100%; min-height: 0; }
+  .list-pane { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  .list-head { padding: 14px 14px 10px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
+  .search {
+    width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+    font: inherit; background: var(--panel-2); color: var(--ink);
+  }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filter {
+    border: 1px solid var(--line); background: var(--panel); border-radius: 999px;
+    padding: 4px 10px; font-size: 12.5px; cursor: pointer; color: var(--muted);
+  }
+  .filter.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+  .ticket-list { overflow-y: auto; flex: 1; }
+  .item {
+    display: grid; gap: 4px; padding: 12px 14px; border-bottom: 1px solid var(--line);
+    cursor: pointer; border-left: 3px solid transparent;
+  }
+  .item:hover { background: var(--panel-2); }
+  .item.active { background: var(--accent-soft); border-left-color: var(--accent); }
+  .item .top { display: flex; align-items: center; gap: 8px; }
+  .item .name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .time { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+  .item .snippet { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .bottom { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted); }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge.waiting_owner { background: var(--amber-soft); color: var(--amber); }
+  .badge.owner_replied { background: var(--blue-soft); color: var(--blue); }
+  .badge.resolved { background: var(--green-soft); color: var(--green); }
+  .badge.cancelled { background: var(--red-soft); color: var(--red); }
+
+  .detail-pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); }
+  .detail-head {
+    padding: 12px 20px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .detail-head .who { font-weight: 700; font-size: 15px; }
+  .detail-head .sub { color: var(--muted); font-size: 12.5px; }
+  .back { display: none; }
+  .detail-body { flex: 1; overflow-y: auto; display: grid; grid-template-columns: 1fr 300px; min-height: 0; }
+  .chat { background: var(--chat-bg); padding: 20px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+  .bubble {
+    max-width: 78%; padding: 8px 12px 6px; border-radius: 10px; box-shadow: 0 1px 1px rgba(0,0,0,0.08);
+    white-space: pre-wrap; word-wrap: break-word; line-height: 1.4;
+  }
+  .bubble.in { background: var(--bubble-in); align-self: flex-start; border-top-left-radius: 2px; }
+  .bubble.out { background: var(--bubble-out); align-self: flex-end; border-top-right-radius: 2px; }
+  .bubble .label { font-size: 11.5px; font-weight: 700; color: var(--accent); margin-bottom: 2px; }
+  .bubble .stamp { font-size: 11px; color: var(--muted); text-align: right; margin-top: 2px; }
+  .sys { align-self: center; background: rgba(255,255,255,0.85); color: var(--muted); font-size: 12px; padding: 4px 10px; border-radius: 8px; }
+
+  .side { border-left: 1px solid var(--line); padding: 16px; display: grid; gap: 16px; align-content: start; overflow-y: auto; }
+  .side h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .side dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 13px; }
+  .side dt { color: var(--muted); }
+  .side dd { margin: 0; overflow-wrap: anywhere; }
+  textarea {
+    width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+    font: inherit; color: var(--ink); background: var(--panel); resize: vertical;
+  }
+  .side textarea { min-height: 90px; font-size: 13px; }
+  .btn-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+
+  .btn {
+    border: 1px solid transparent; border-radius: 8px; padding: 7px 12px; font-weight: 600;
+    cursor: pointer; background: var(--accent); color: var(--accent-ink);
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: 0.55; cursor: wait; }
+  .btn.ghost { background: var(--panel); color: var(--ink); border-color: var(--line); }
+  .btn.ghost:hover { background: var(--panel-2); filter: none; }
+  .btn.sm { padding: 5px 10px; font-size: 12.5px; }
+
+  .composer { border-top: 1px solid var(--line); padding: 12px 20px; background: var(--panel); display: grid; gap: 8px; }
+  .composer .bar { display: flex; gap: 8px; align-items: flex-end; }
+  .composer textarea { min-height: 44px; max-height: 180px; }
+  .composer .hint { color: var(--muted); font-size: 12px; }
+  .alert { border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+  .alert.err { background: var(--red-soft); color: var(--red); }
+  .alert.ok { background: var(--green-soft); color: var(--green); }
+  .alert.warn { background: var(--amber-soft); color: var(--amber); }
+
+  .placeholder { margin: auto; color: var(--muted); text-align: center; padding: 40px; }
+
+  /* Orders */
+  .orders { width: 100%; overflow-y: auto; }
+  .orders-wrap { max-width: 1200px; margin: 0 auto; padding: 20px; display: grid; gap: 16px; }
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .toolbar label { color: var(--muted); font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; }
+  .toolbar input {
+    padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: var(--panel); color: var(--ink);
+  }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .kpi .label { color: var(--muted); font-size: 12px; }
+  .kpi .value { font-size: 24px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .kpi .note { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; }
+  .card h2 { margin: 0 0 2px; font-size: 14px; }
+  .card .hint { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+  .grid2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  .grid-half { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chart-box { position: relative; height: 240px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11.5px; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 8px; border-bottom: 1px solid var(--line); font-size: 13px; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  .day-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chip { background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12px; }
+  .empty { color: var(--muted); text-align: center; padding: 18px 0; font-size: 13px; }
+  .table-scroll { overflow-x: auto; }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(90px);
+    background: #111827; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2); transition: transform 0.2s ease; z-index: 50; max-width: 90vw;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.ok { background: var(--green); }
+  .toast.err { background: var(--red); }
+  .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: rot 0.7s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+
+  /* Knowledge */
+  [hidden] { display: none !important; }
+  .kb { width: 100%; overflow-y: auto; }
+  .drop {
+    border: 2px dashed var(--line); border-radius: var(--radius); padding: 22px; text-align: center;
+    color: var(--muted); background: var(--panel-2); cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .drop.over { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .drop strong { color: var(--ink); }
+  .file-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 12px; }
+  .file-group { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; min-width: 0; }
+  .file-group b { display: block; font-size: 13px; margin-bottom: 4px; }
+  .file-group .names { color: var(--muted); max-height: 84px; overflow-y: auto; overflow-wrap: anywhere; }
+  .form-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; margin-top: 14px; }
+  .form-row label { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+  .form-row input[type=text] { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; color: var(--ink); background: var(--panel); min-width: 200px; }
+  .modes { display: flex; gap: 8px; flex-wrap: wrap; }
+  .mode { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; display: flex; gap: 8px; align-items: flex-start; max-width: 320px; font-size: 13px; color: var(--ink); }
+  .mode small { display: block; color: var(--muted); font-size: 12px; }
+  .mode.on { border-color: var(--accent); background: var(--accent-soft); }
+  .mode.danger.on { border-color: var(--red); background: var(--red-soft); }
+  .result { margin-top: 14px; font-size: 13px; display: grid; gap: 6px; }
+  .kb-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .kb-tools .search { max-width: 320px; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .asset { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel); display: flex; flex-direction: column; }
+  .asset img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--panel-2); display: block; }
+  .asset .meta { padding: 8px 10px; font-size: 12px; display: grid; gap: 3px; }
+  .asset .meta b { font-size: 12.5px; overflow-wrap: anywhere; }
+  .kind { display: inline-block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
+  .qa-list td.q { font-weight: 600; width: 34%; }
+  .tag-ref { background: var(--amber-soft); color: var(--amber); }
+  .tag-ok { background: var(--green-soft); color: var(--green); }
+  .tag-new { background: var(--blue-soft); color: var(--blue); }
+  .tag-del { background: var(--red-soft); color: var(--red); }
+  .search-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .search-row .search { flex: 1; min-width: 220px; }
+  .hits { display: grid; gap: 8px; margin-top: 12px; }
+  .hit { display: grid; grid-template-columns: 64px 1fr; gap: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; align-items: start; }
+  .hit.below { opacity: .55; }
+  .hit .score { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 15px; }
+  .hit .score small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); }
+  .hit img { width: 96px; height: 96px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); float: right; margin-left: 10px; }
+  .hit .q { font-weight: 600; }
+  .preview-head { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 14px 0 8px; }
+
+  @media (max-width: 1100px) {
+    .detail-body { grid-template-columns: 1fr; }
+    .side { border-left: 0; border-top: 1px solid var(--line); }
+    .grid2, .grid-half { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 760px) {
+    .topbar { padding: 0 12px; gap: 8px; }
+    .brand small, .status span:last-child { display: none; }
+    .inbox { grid-template-columns: 1fr; }
+    .inbox.has-detail .list-pane { display: none; }
+    .inbox:not(.has-detail) .detail-pane { display: none; }
+    .back { display: inline-block; }
+    .bubble { max-width: 92%; }
+    .orders-wrap { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">SaViOr Admin <small>WhatsApp</small></div>
+  <nav class="tabs">
+    <button class="tab active" data-view="tickets">Tiket <span class="count" id="tabCount"></span></button>
+    <button class="tab" data-view="orders">Order</button>
+    <button class="tab" data-view="knowledge">Knowledge</button>
+  </nav>
+  <div class="spacer"></div>
+  <div class="status" id="status" title=""><span class="dot"></span><span id="statusText">menghubungi…</span></div>
+  <button class="icon-btn" id="refreshBtn" title="Muat ulang">↻</button>
+</header>
+
+<main>
+  <section class="view active" id="view-tickets">
+    <div class="inbox" id="inbox">
+      <aside class="list-pane">
+        <div class="list-head">
+          <input class="search" id="search" type="search" placeholder="Cari nama, nomor, kode, atau isi…">
+          <div class="filters" id="filters">
+            <button class="filter active" data-filter="open">Perlu dibalas</button>
+            <button class="filter" data-filter="resolved">Selesai</button>
+            <button class="filter" data-filter="all">Semua</button>
+          </div>
+        </div>
+        <div class="ticket-list" id="ticketList"><div class="empty">Memuat tiket…</div></div>
+      </aside>
+      <section class="detail-pane" id="detail">
+        <div class="placeholder">Pilih tiket di sebelah kiri untuk melihat percakapan dan membalas pelanggan.</div>
+      </section>
+    </div>
+  </section>
+
+  <section class="view orders" id="view-orders">
+    <div class="orders-wrap">
+      <div class="toolbar">
+        <label>Bulan <input type="month" id="monthPicker"></label>
+        <label>Tanggal <input type="date" id="datePicker"></label>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="label">Order bulan ini</div><div class="value" id="kpiOrders">–</div><div class="note" id="kpiOrdersNote"></div></div>
+        <div class="kpi"><div class="label">Dikonfirmasi pelanggan</div><div class="value" id="kpiConfirmed">–</div><div class="note">ada pesan pelanggan setelah order</div></div>
+        <div class="kpi"><div class="label">Order tanggal terpilih</div><div class="value" id="kpiDay">–</div><div class="note" id="kpiDayNote"></div></div>
+        <div class="kpi"><div class="label">Pcs tanggal terpilih</div><div class="value" id="kpiPcs">–</div><div class="note" id="kpiPcsNote"></div></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h2>Order per tanggal</h2>
+          <div class="hint" id="monthHint">Bulan berjalan</div>
+          <div class="chart-box"><canvas id="chartMonth"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Tanggal terpilih vs kemarin</h2>
+          <div class="hint">Jumlah order</div>
+          <div class="chart-box"><canvas id="chartCompare"></canvas></div>
+        </div>
+      </div>
+      <div class="grid-half">
+        <div class="card" id="colCurrent"><div class="empty">Memuat…</div></div>
+        <div class="card" id="colPrevious"><div class="empty">Memuat…</div></div>
+      </div>
+      <div class="card">
+        <h2>Rincian per tanggal</h2>
+        <div class="hint">Hanya tanggal yang punya order</div>
+        <div class="table-scroll"><table>
+          <thead><tr><th>Tanggal</th><th class="num">Order</th><th class="num">Dikonfirmasi</th><th class="num">Nilai</th></tr></thead>
+          <tbody id="monthRows"><tr><td colspan="4" class="empty">Memuat…</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+  <section class="view kb" id="view-knowledge">
+    <div class="orders-wrap">
+      <div class="card">
+        <h2>Impor knowledge dari chat WhatsApp</h2>
+        <div class="hint">Pilih file ekspor chat (.txt), gambar lampirannya (.jpg/.png/.webp, nama file sama seperti di chat), atau dataset berlabel (.json). Tekan <b>Pratinjau</b> untuk melihat apa yang akan diimpor (baru, diperbarui, atau dihapus) tanpa mengubah data, lalu <b>Simpan</b>.</div>
+        <div class="drop" id="kbDrop"><strong>Tarik file ke sini</strong> atau klik untuk memilih<br><small>Bisa banyak file sekaligus</small></div>
+        <input type="file" id="kbFiles" multiple accept=".txt,.json,.jpg,.jpeg,.png,.webp" hidden>
+        <div class="file-groups" id="kbGroups"></div>
+        <div class="form-row">
+          <label>Nama owner di chat <input type="text" id="kbOwner" value="SaViOr Konveksi"></label>
+          <div class="modes" id="kbModes">
+            <div class="mode on" data-mode="append"><input type="radio" name="kbmode" checked><div>Tambah ke knowledge<small>Data lama tetap, entri dengan id sama diperbarui.</small></div></div>
+            <div class="mode danger" data-mode="replace"><input type="radio" name="kbmode"><div>Ganti semua knowledge<small>Hapus SEMUA knowledge lama setelah data baru berhasil diproses.</small></div></div>
+          </div>
+          <label id="kbConfirmWrap" hidden>Ketik HAPUS untuk konfirmasi <input type="text" id="kbConfirm" autocomplete="off"></label>
+          <button class="btn ghost" id="kbPreview">1. Pratinjau</button>
+          <button class="btn" id="kbImport" disabled>2. Simpan ke knowledge</button>
+        </div>
+        <div class="result" id="kbResult"></div>
+        <div id="kbPreviewBox"></div>
+      </div>
+
+      <div class="card">
+        <h2>Cek knowledge (query Qdrant)</h2>
+        <div class="hint">Ketik pertanyaan seperti pelanggan. Hasil diurutkan seperti pencarian bot; yang skornya di bawah ambang tidak dipakai bot.</div>
+        <div class="search-row">
+          <input class="search" id="kbQuery" type="search" placeholder="contoh: minta size chart jaket">
+          <button class="btn" id="kbQueryBtn">Cari</button>
+        </div>
+        <div class="hits" id="kbHits"></div>
+      </div>
+
+      <div class="kpis" id="kbKpis"></div>
+
+      <div class="card">
+        <h2>Aset gambar</h2>
+        <div class="hint">Gambar yang bisa dikirim bot saat pelanggan meminta size chart, katalog, price list, atau contoh produk.</div>
+        <div class="gallery" id="kbGallery"><div class="empty">Memuat…</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Knowledge teks</h2>
+        <div class="kb-tools">
+          <input class="search" id="kbSearch" type="search" placeholder="Cari pertanyaan atau jawaban…">
+          <div class="filters" id="kbCats"></div>
+        </div>
+        <div class="table-scroll"><table class="qa-list">
+          <thead><tr><th>Pertanyaan</th><th>Jawaban</th><th>Kategori</th></tr></thead>
+          <tbody id="kbRows"><tr><td colspan="3" class="empty">Memuat…</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+const fmt = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
+const fmtRp = (v) => 'Rp ' + fmt.format(Number(v || 0));
+const STATUS = { waiting_owner: 'Menunggu owner', owner_replied: 'Belum terkirim', resolved: 'Selesai', cancelled: 'Dibatalkan' };
+
+const state = { tickets: [], selected: null, filter: 'open', query: '', health: null, ordersLoaded: false };
+let chartMonth = null;
+let chartCompare = null;
+
+function toast(text, type) {
+  const el = $('#toast');
+  el.textContent = text;
+  el.className = 'toast show ' + (type || '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.className = 'toast'; }, 4000);
+}
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.message || data.detail || data.error || ('HTTP ' + res.status));
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+const post = (path, body) => api(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) });
+
+function esc(text) {
+  return String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+}
+function fmtRelative(iso) {
+  const d = new Date(iso);
+  const mins = Math.round((Date.now() - d) / 60000);
+  if (mins < 1) return 'baru saja';
+  if (mins < 60) return mins + ' mnt';
+  if (mins < 1440) return Math.round(mins / 60) + ' jam';
+  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+}
+function localDate(d = new Date()) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function monthLabel(monthStr) {
+  const [y, m] = monthStr.split('-');
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+}
+const isOpen = (t) => t.status === 'waiting_owner' || t.status === 'owner_replied';
+
+/* ---------- Health ---------- */
+const CHANNEL_LABEL = { 'n8n-webhook': 'WhatsApp via n8n', 'whatsapp-cloud-api': 'WhatsApp Cloud API', 'mock-whatsapp': 'WhatsApp mock (uji)' };
+async function loadHealth() {
+  const el = $('#status');
+  try {
+    const h = await api('/api/health');
+    state.health = h;
+    el.classList.toggle('off', !h.wa_configured);
+    $('#statusText').textContent = h.wa_configured ? (CHANNEL_LABEL[h.wa_channel] || 'WhatsApp aktif') : 'Pengiriman WA belum aktif';
+    el.title = 'Zona waktu ' + (h.timezone || '?');
+  } catch {
+    el.classList.add('off');
+    $('#statusText').textContent = 'API tidak terjangkau';
+  }
+}
+
+/* ---------- Tickets ---------- */
+async function loadTickets() {
+  try {
+    const data = await api('/api/tickets');
+    const before = state.tickets.find((x) => x.ticket_id === state.selected);
+    state.tickets = data.tickets || [];
+    const open = state.tickets.filter(isOpen).length;
+    $('#tabCount').textContent = open ? String(open) : '';
+    renderList();
+    if (state.selected) {
+      const t = state.tickets.find((x) => x.ticket_id === state.selected);
+      // Polling tidak menggambar ulang panel (supaya teks yang sedang diketik tidak hilang),
+      // kecuali status/jawaban tiket berubah.
+      const changed = !before || before.status !== t?.status || before.owner_answer !== t?.owner_answer || before.needs_summary !== t?.needs_summary;
+      if (t && changed) renderDetail(t, { keepDraft: true });
+    }
+  } catch (err) {
+    $('#ticketList').innerHTML = '<div class="empty">Gagal memuat tiket: ' + esc(err.message) + '</div>';
+  }
+}
+
+function filteredTickets() {
+  const q = state.query.trim().toLowerCase();
+  return state.tickets.filter((t) => {
+    if (state.filter === 'open' && !isOpen(t)) return false;
+    if (state.filter === 'resolved' && t.status !== 'resolved') return false;
+    if (!q) return true;
+    return [t.code, t.customer_name, t.customer_phone, t.question, t.needs_summary, t.owner_answer]
+      .some((v) => String(v || '').toLowerCase().includes(q));
+  });
+}
+
+function renderList() {
+  const list = $('#ticketList');
+  const items = filteredTickets();
+  if (!items.length) {
+    list.innerHTML = '<div class="empty">' + (state.filter === 'open' ? 'Tidak ada tiket yang menunggu. 🎉' : 'Tidak ada tiket.') + '</div>';
+    return;
+  }
+  list.innerHTML = items.map((t) =>
+    '<div class="item' + (t.ticket_id === state.selected ? ' active' : '') + '" data-id="' + esc(t.ticket_id) + '">' +
+      '<div class="top"><span class="name">' + esc(t.customer_name) + '</span><span class="time">' + esc(fmtRelative(t.created_at)) + '</span></div>' +
+      '<div class="snippet">' + esc(t.needs_summary || t.question) + '</div>' +
+      '<div class="bottom"><span class="badge ' + esc(t.status) + '">' + esc(STATUS[t.status] || t.status) + '</span><span>#' + esc(t.code) + '</span></div>' +
+    '</div>'
+  ).join('');
+}
+
+function selectTicket(id) {
+  state.selected = id;
+  const t = state.tickets.find((x) => x.ticket_id === id);
+  renderList();
+  if (t) renderDetail(t);
+  $('#inbox').classList.add('has-detail');
+}
+
+function renderDetail(t, opts = {}) {
+  const pane = $('#detail');
+  const draft = opts.keepDraft ? ($('#replyBox')?.value || '') : '';
+  const summaryDraft = opts.keepDraft ? $('#summaryBox')?.value : null;
+  const open = isOpen(t);
+  const notConfigured = state.health && !state.health.wa_configured;
+
+  let chat = '<div class="sys">Tiket #' + esc(t.code) + ' dibuat ' + esc(fmtDate(t.created_at)) + '</div>' +
+    '<div class="bubble in"><div class="label">' + esc(t.customer_name) + '</div>' + esc(t.question) + '<div class="stamp">' + esc(fmtDate(t.created_at)) + '</div></div>';
+  if (t.owner_answer) {
+    chat += '<div class="bubble out"><div class="label">Owner</div>' + esc(t.owner_answer) + '<div class="stamp">' + esc(fmtDate(t.owner_replied_at)) + (t.status === 'resolved' ? ' ✓' : '') + '</div></div>';
+    if (t.status === 'owner_replied') chat += '<div class="sys" style="color:var(--red)">Jawaban belum terkirim ke pelanggan. Kirim ulang di bawah.</div>';
+    if (t.status === 'resolved') chat += '<div class="sys">Selesai ' + esc(fmtDate(t.resolved_at)) + '</div>';
+  }
+
+  let composer;
+  if (open) {
+    composer =
+      (notConfigured ? '<div class="alert warn">Pengiriman WhatsApp dari dashboard belum aktif. Balasan tidak bisa dikirim sampai kanal dikonfigurasi.</div>' : '') +
+      '<div id="sendResult"></div>' +
+      '<div class="bar"><textarea id="replyBox" placeholder="Tulis jawaban untuk ' + esc(t.customer_name) + '…">' + esc(draft || (t.status === 'owner_replied' ? t.owner_answer || '' : '')) + '</textarea>' +
+      '<button class="btn" id="sendBtn">Kirim</button></div>' +
+      '<div class="hint">Dikirim ke ' + esc(t.customer_phone) + ' lewat WhatsApp. Tiket ditandai selesai hanya jika pesan diterima WhatsApp. Ctrl/⌘ + Enter untuk kirim.</div>';
+  } else if (t.owner_answer) {
+    composer = '<div id="sendResult"></div><div class="bar"><div class="hint" style="flex:1">Tiket selesai. Jika pelanggan tidak menerima jawaban, kirim ulang.</div>' +
+      '<button class="btn ghost" id="resendBtn">Kirim ulang jawaban</button></div>';
+  } else {
+    composer = '<div class="hint">Tiket ditutup.</div>';
+  }
+
+  pane.innerHTML =
+    '<div class="detail-head">' +
+      '<button class="btn ghost sm back" id="backBtn">← Kembali</button>' +
+      '<div><div class="who">' + esc(t.customer_name) + '</div><div class="sub">' + esc(t.customer_phone) + ' · #' + esc(t.code) + '</div></div>' +
+      '<div class="spacer"></div><span class="badge ' + esc(t.status) + '">' + esc(STATUS[t.status] || t.status) + '</span>' +
+    '</div>' +
+    '<div class="detail-body">' +
+      '<div class="chat" id="chat">' + chat + '</div>' +
+      '<aside class="side">' +
+        '<div><h3>Ringkasan untuk owner</h3>' +
+          '<textarea id="summaryBox" placeholder="Ringkasan kebutuhan pelanggan…">' + esc(summaryDraft ?? t.needs_summary ?? '') + '</textarea>' +
+          '<div class="btn-row"><button class="btn ghost sm" id="aiBtn">Ringkas dengan AI</button><button class="btn ghost sm" id="saveSumBtn">Simpan</button></div></div>' +
+        (t.owner_question ? '<div><h3>Pertanyaan bot ke owner</h3><div style="font-size:13px;white-space:pre-wrap">' + esc(t.owner_question) + '</div></div>' : '') +
+        '<div><h3>Detail</h3><dl>' +
+          '<dt>Kode</dt><dd>#' + esc(t.code) + '</dd>' +
+          '<dt>Nomor</dt><dd>' + esc(t.customer_phone) + '</dd>' +
+          '<dt>Dibuat</dt><dd>' + esc(fmtDate(t.created_at)) + '</dd>' +
+          (t.owner_replied_at ? '<dt>Dibalas</dt><dd>' + esc(fmtDate(t.owner_replied_at)) + '</dd>' : '') +
+          (t.resolved_at ? '<dt>Selesai</dt><dd>' + esc(fmtDate(t.resolved_at)) + '</dd>' : '') +
+        '</dl></div>' +
+      '</aside>' +
+    '</div>' +
+    '<div class="composer">' + composer + '</div>';
+
+  $('#backBtn').addEventListener('click', () => { $('#inbox').classList.remove('has-detail'); });
+  $('#aiBtn').addEventListener('click', (e) => summarize(t, e.currentTarget, false));
+  $('#saveSumBtn').addEventListener('click', (e) => summarize(t, e.currentTarget, true));
+  const sendBtn = $('#sendBtn');
+  if (sendBtn) {
+    sendBtn.addEventListener('click', () => sendReply(t));
+    $('#replyBox').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendReply(t); });
+  }
+  const resendBtn = $('#resendBtn');
+  if (resendBtn) resendBtn.addEventListener('click', () => resend(t));
+  const chatEl = $('#chat');
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function showResult(kind, text) {
+  const el = $('#sendResult');
+  if (el) el.innerHTML = text ? '<div class="alert ' + kind + '">' + esc(text) + '</div>' : '';
+}
+
+async function summarize(t, btn, saveOnly) {
+  const label = btn.textContent;
+  btn.disabled = true;
+  if (!saveOnly) btn.textContent = 'Meringkas…';
+  try {
+    const body = saveOnly ? { summary: $('#summaryBox').value.trim() } : {};
+    if (saveOnly && !body.summary) throw new Error('Ringkasan kosong.');
+    const r = await post('/api/tickets/' + t.ticket_id + '/summarize', body);
+    if (r.needs_summary) $('#summaryBox').value = r.needs_summary;
+    t.needs_summary = $('#summaryBox').value;
+    renderList();
+    toast(saveOnly ? 'Ringkasan disimpan.' : 'Ringkasan AI tersimpan.', 'ok');
+  } catch (err) {
+    toast(err.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+}
+
+async function sendReply(t) {
+  const box = $('#replyBox');
+  const btn = $('#sendBtn');
+  const reply = box.value.trim();
+  if (!reply) return toast('Tulis jawaban terlebih dahulu.', 'err');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Mengirim';
+  showResult('', '');
+  try {
+    const r = await post('/api/tickets/' + t.ticket_id + '/reply', { reply });
+    toast('Terkirim ke ' + r.customer_phone + '. Tiket #' + r.ticket_code + ' selesai.', 'ok');
+    box.value = '';
+    await loadTickets();
+  } catch (err) {
+    await loadTickets();
+    showResult('err', err.message + (err.data?.error === 'delivery_failed' ? ' Tiket tetap terbuka.' : ''));
+    toast('Gagal mengirim.', 'err');
+  } finally {
+    const b = $('#sendBtn');
+    if (b) { b.disabled = false; b.textContent = 'Kirim'; }
+  }
+}
+
+async function resend(t) {
+  if (!confirm('Kirim ulang jawaban owner ke ' + t.customer_phone + '?')) return;
+  const btn = $('#resendBtn');
+  btn.disabled = true;
+  btn.textContent = 'Mengirim…';
+  try {
+    await post('/api/tickets/' + t.ticket_id + '/resend');
+    showResult('ok', 'Jawaban terkirim ulang ke ' + t.customer_phone + '.');
+    toast('Terkirim ulang.', 'ok');
+  } catch (err) {
+    showResult('err', err.message);
+    toast('Gagal mengirim ulang.', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Kirim ulang jawaban';
+  }
+}
+
+/* ---------- Orders ---------- */
+const chartOpts = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, font: { size: 11 } } } },
+  scales: {
+    y: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 } }, grid: { color: '#eef0f3' } },
+    x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+  },
+};
+
+async function loadMonth() {
+  const month = $('#monthPicker').value || localDate().slice(0, 7);
+  $('#monthHint').textContent = monthLabel(month);
+  const data = await api('/api/orders/month?month=' + month);
+  $('#kpiOrders').textContent = fmt.format(data.total_orders || 0);
+  $('#kpiOrdersNote').textContent = fmtRp(data.total_value) + ' · ' + monthLabel(month);
+  $('#kpiConfirmed').textContent = fmt.format(data.confirmed_orders || 0);
+  const days = data.days || [];
+  if (chartMonth) chartMonth.destroy();
+  chartMonth = new Chart($('#chartMonth'), {
+    type: 'bar',
+    data: {
+      labels: days.map((d) => String(d.date).slice(8)),
+      datasets: [
+        { label: 'Order', data: days.map((d) => d.orders), backgroundColor: '#0f766e', borderRadius: 4, barPercentage: 0.75 },
+        { label: 'Dikonfirmasi', data: days.map((d) => d.confirmed), backgroundColor: '#5eead4', borderRadius: 4, barPercentage: 0.75 },
+      ],
+    },
+    options: chartOpts,
+  });
+  $('#monthRows').innerHTML = days.filter((d) => d.orders > 0 || d.confirmed > 0).map((d) =>
+    '<tr><td>' + new Date(d.date + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' }) + '</td>' +
+    '<td class="num">' + fmt.format(d.orders) + '</td><td class="num">' + fmt.format(d.confirmed) + '</td><td class="num">' + fmtRp(d.value) + '</td></tr>'
+  ).join('') || '<tr><td colspan="4" class="empty">Belum ada order pada bulan ini.</td></tr>';
+}
+
+function renderDay(container, data, title) {
+  const rows = data.rows.length
+    ? '<div class="table-scroll"><table><thead><tr><th>Order</th><th>Item</th><th class="num">Pcs</th><th>Tipe</th><th class="num">Total</th><th>Status</th></tr></thead><tbody>' +
+      data.rows.map((r) =>
+        '<tr><td>' + esc(r.order_number) + '<div class="muted" style="font-size:11.5px">' + esc(r.customer_name || '') + '</div></td>' +
+        '<td>' + esc(r.title) + '</td><td class="num">' + fmt.format(r.pcs) + '</td><td>' + esc(r.type) + '</td>' +
+        '<td class="num">' + fmtRp(r.line_total) + '</td><td>' + esc(r.status) + '</td></tr>').join('') +
+      '</tbody></table></div>'
+    : '<div class="empty">Tidak ada order.</div>';
+  container.innerHTML =
+    '<div class="day-head"><h2>' + esc(title) + '</h2><span class="muted">' +
+      new Date(data.date + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' }) + '</span></div>' +
+    '<div class="chips"><span class="chip">' + fmt.format(data.total_orders) + ' order</span><span class="chip">' + fmt.format(data.total_pcs) + ' pcs</span><span class="chip">' + fmtRp(data.total_value) + '</span>' +
+      data.by_type.map((x) => '<span class="chip">' + esc(x.type) + ' · ' + fmt.format(x.pcs) + '</span>').join('') + '</div>' + rows;
+}
+
+async function loadOrders() {
+  const date = $('#datePicker').value || localDate();
+  const data = await api('/api/orders?date=' + date);
+  renderDay($('#colCurrent'), data.current, 'Tanggal terpilih');
+  renderDay($('#colPrevious'), data.previous, 'Hari sebelumnya');
+  $('#kpiDay').textContent = fmt.format(data.current.total_orders);
+  $('#kpiDayNote').textContent = fmtRp(data.current.total_value) + ' · kemarin ' + fmt.format(data.previous.total_orders);
+  $('#kpiPcs').textContent = fmt.format(data.current.total_pcs);
+  $('#kpiPcsNote').textContent = 'kemarin ' + fmt.format(data.previous.total_pcs) + ' pcs';
+  if (chartCompare) chartCompare.destroy();
+  chartCompare = new Chart($('#chartCompare'), {
+    type: 'bar',
+    data: {
+      labels: [data.previous.date.slice(5), data.current.date.slice(5)],
+      datasets: [{ label: 'Order', data: [data.previous.total_orders, data.current.total_orders], backgroundColor: ['#99d5cf', '#0f766e'], borderRadius: 4, barPercentage: 0.5 }],
+    },
+    options: { ...chartOpts, plugins: { legend: { display: false } } },
+  });
+}
+
+async function loadOrdersView() {
+  try {
+    await Promise.all([loadMonth(), loadOrders()]);
+    state.ordersLoaded = true;
+  } catch (err) {
+    toast(err.message, 'err');
+  }
+}
+
+/* ---------- Knowledge ---------- */
+const KB_TYPE = { chat_qa: 'Tanya jawab', price_list: 'Price list resmi', price_reference: 'Referensi harga (owner)', image_asset: 'Aset gambar' };
+const KB_KIND = { size_chart: 'Size chart', katalog: 'Katalog', price_list: 'Price list', contoh_produk: 'Foto produk', contoh_desain: 'Contoh desain', referensi_model: 'Referensi model', referensi_ukuran: 'Referensi ukuran', referensi_detail: 'Detail' };
+const kb = { files: [], mode: 'append', data: null, cat: 'all', query: '', loaded: false };
+
+function kbAddFiles(list) {
+  for (const f of list) if (!kb.files.some((x) => x.name === f.name && x.size === f.size)) kb.files.push(f);
+  kbRenderFiles();
+}
+function kbGroups() {
+  return {
+    chats: kb.files.filter((f) => /\.txt$/i.test(f.name)),
+    images: kb.files.filter((f) => /\.(jpe?g|png|webp)$/i.test(f.name)),
+    datasets: kb.files.filter((f) => /\.json$/i.test(f.name)),
+  };
+}
+function kbRenderFiles() {
+  const g = kbGroups();
+  kb.preview = null;
+  if ($('#kbPreviewBox')) $('#kbPreviewBox').innerHTML = '';
+  if ($('#kbImport')) $('#kbImport').disabled = true;
+  const box = (title, files) => files.length ? '<div class="file-group"><b>' + title + ' (' + files.length + ')</b><div class="names">' + files.map((f) => esc(f.name)).join('<br>') + '</div></div>' : '';
+  $('#kbGroups').innerHTML = box('Chat WhatsApp', g.chats) + box('Gambar', g.images) + box('Dataset JSON', g.datasets) +
+    (kb.files.length ? '<div class="file-group"><button class="btn ghost sm" id="kbClear">Kosongkan pilihan</button></div>' : '');
+  const clear = $('#kbClear');
+  if (clear) clear.addEventListener('click', () => { kb.files = []; kbRenderFiles(); });
+}
+const readBase64 = (file) => new Promise((resolve, reject) => {
+  const r = new FileReader();
+  r.onload = () => resolve(String(r.result).split(',')[1] || '');
+  r.onerror = () => reject(r.error);
+  r.readAsDataURL(file);
+});
+
+function kbPayloadBase() {
+  return { mode: kb.mode, confirm: $('#kbConfirm').value, owner_name: $('#kbOwner').value };
+}
+async function kbReadFiles() {
+  const g = kbGroups();
+  let dataset = null;
+  for (const f of g.datasets) {
+    const d = JSON.parse(await f.text());
+    dataset = dataset || { items: [], image_assets: [], style_profile: '' };
+    dataset.items.push(...(d.items || []));
+    dataset.image_assets.push(...(d.image_assets || []));
+    dataset.style_profile = d.style_profile || dataset.style_profile;
+  }
+  const chats = await Promise.all(g.chats.map(async (f) => ({ file_name: f.name, text: await f.text() })));
+  const images = await Promise.all(g.images.map(async (f) => ({ file_name: f.name, data_base64: await readBase64(f) })));
+  return { dataset, chats, images };
+}
+function kbBusy(btn, text) {
+  btn.disabled = true;
+  btn.dataset.label = btn.dataset.label || btn.textContent;
+  btn.innerHTML = '<span class="spin"></span>' + text;
+}
+function kbIdle(btn) { btn.disabled = false; btn.textContent = btn.dataset.label || btn.textContent; }
+
+async function kbPreview() {
+  const g = kbGroups();
+  if (!g.chats.length && !g.datasets.length) return toast('Pilih minimal satu file chat (.txt) atau dataset (.json).', 'err');
+  const btn = $('#kbPreview');
+  kbBusy(btn, 'Memproses…');
+  $('#kbImport').disabled = true;
+  kb.preview = null;
+  $('#kbPreviewBox').innerHTML = '';
+  $('#kbResult').innerHTML = '<div class="alert warn">Membaca dan melabeli data. Untuk chat, pelabelan bisa memakan beberapa menit; belum ada data yang diubah.</div>';
+  try {
+    const files = await kbReadFiles();
+    const r = await post('/api/knowledge/import', { ...kbPayloadBase(), ...files, dry_run: true });
+    if (!kb.loaded) await loadKnowledge();
+    kb.preview = { ...r, images: files.images };
+    kbRenderPreview();
+    $('#kbResult').innerHTML = (r.chunks_failed ? '<div class="alert warn">' + r.chunks_failed + ' potongan chat gagal dilabeli (limit model). Pratinjau ulang untuk mencoba lagi.</div>' : '') +
+      ((r.chats || []).length ? '<div class="muted">' + r.chats.map((c) => esc(c.chat) + ': ' + (c.error ? esc(c.error) : c.messages + ' pesan, ' + c.chunks + ' potongan, ' + c.owner_images + ' gambar dari owner')).join('<br>') + '</div>' : '');
+    $('#kbImport').disabled = !(r.documents || []).length;
+  } catch (err) {
+    $('#kbResult').innerHTML = '<div class="alert err">' + esc(err.message) + '</div>';
+  } finally {
+    kbIdle(btn);
+  }
+}
+
+function kbRenderPreview() {
+  const p = kb.preview;
+  if (!p) { $('#kbPreviewBox').innerHTML = ''; return; }
+  const existing = new Set([...(kb.data?.items || []).map((i) => i.id), ...(kb.data?.assets || []).map((a) => a.asset_id)]);
+  const docs = (p.documents || []).map((d) => ({ ...d, status: existing.has(d.kb_id) ? 'update' : 'new' }));
+  const incoming = new Set(docs.map((d) => d.kb_id));
+  const removed = kb.mode === 'replace' ? [
+    ...(kb.data?.items || []).filter((i) => !incoming.has(i.id)).map((i) => ({ kb_id: i.id, content_type: i.type, category: i.category, question: i.question, answer: i.answer, status: 'delete' })),
+    ...(kb.data?.assets || []).filter((a) => !incoming.has(a.asset_id)).map((a) => ({ kb_id: a.asset_id, content_type: 'image_asset', asset_id: a.asset_id, file: a.file, caption: a.caption, status: 'delete' })),
+  ] : [];
+  const n = (st) => docs.filter((d) => d.status === st).length;
+  const label = { new: ['Baru', 'tag-new'], update: ['Diperbarui', 'tag-ok'], delete: ['Dihapus', 'tag-del'] };
+  const row = (d) => '<tr><td><span class="badge ' + label[d.status][1] + '">' + label[d.status][0] + '</span></td><td>' + esc(KB_TYPE[d.content_type] || d.content_type) +
+    (d.category ? '<div class="muted" style="font-size:11.5px">' + esc(d.category.replace(/_/g, ' ')) + '</div>' : '') + '</td><td>' +
+    (d.content_type === 'image_asset'
+      ? '<b>' + esc(d.asset_id) + '</b> <span class="muted">' + esc(d.file) + '</span><div>' + esc(d.caption) + '</div>'
+      : '<b>' + esc(d.question) + '</b><div>' + esc(d.answer) + '</div>' + (d.auto_reply === false ? '<div class="muted" style="font-size:11.5px">hanya untuk owner</div>' : '')) + '</td></tr>';
+  $('#kbPreviewBox').innerHTML =
+    '<div class="preview-head"><b>Yang akan diimpor ke ' + esc(kb.data?.collection || 'knowledge') + ':</b>' +
+    '<span class="badge tag-new">' + n('new') + ' baru</span><span class="badge tag-ok">' + n('update') + ' diperbarui</span>' +
+    (kb.mode === 'replace' ? '<span class="badge tag-del">' + removed.length + ' dihapus</span>' : '') +
+    (p.skipped ? '<span class="badge waiting_owner">' + p.skipped + ' dilewati</span>' : '') + '</div>' +
+    (p.skipped ? '<div class="muted" style="margin-bottom:8px">Dilewati: ' + esc((p.skipped_detail || []).map((x) => x.id + ' (' + x.reason + ')').slice(0, 10).join(', ')) + '</div>' : '') +
+    '<div class="table-scroll" style="max-height:460px;overflow-y:auto"><table><thead><tr><th>Status</th><th>Jenis</th><th>Isi</th></tr></thead><tbody>' +
+    [...docs, ...removed].map(row).join('') + '</tbody></table></div>';
+}
+
+async function kbImport() {
+  const p = kb.preview;
+  if (!p) return toast('Jalankan pratinjau dulu.', 'err');
+  if (kb.mode === 'replace' && $('#kbConfirm').value.trim().toUpperCase() !== 'HAPUS') return toast('Ketik HAPUS untuk mengganti semua knowledge.', 'err');
+  const btn = $('#kbImport');
+  kbBusy(btn, 'Menyimpan…');
+  try {
+    // Kirim dataset hasil pratinjau, jadi chat tidak dilabeli ulang
+    const r = await post('/api/knowledge/import', { ...kbPayloadBase(), dataset: p.dataset, chats: [], images: p.images || [] });
+    const types = Object.entries(r.by_type || {}).map(([k, v]) => (KB_TYPE[k] || k) + ': ' + v).join(' · ');
+    $('#kbResult').innerHTML = '<div class="alert ok">Tersimpan: ' + fmt.format(r.written || 0) + ' knowledge' + (r.replaced ? ' (knowledge lama diganti)' : '') + '. ' + esc(types) + '</div>' +
+      (r.images && r.images.saved.length ? '<div class="muted">Gambar baru disimpan: ' + r.images.saved.length + '</div>' : '');
+    kb.files = [];
+    kb.preview = null;
+    kbRenderFiles();
+    $('#kbPreviewBox').innerHTML = '';
+    $('#kbConfirm').value = '';
+    toast('Impor knowledge selesai', 'ok');
+    loadKnowledge();
+  } catch (err) {
+    $('#kbResult').innerHTML = '<div class="alert err">' + esc(err.message) + '</div>';
+    toast(err.message, 'err');
+    btn.disabled = false;
+  } finally {
+    btn.textContent = btn.dataset.label || 'Simpan';
+  }
+}
+
+async function kbSearch() {
+  const q = $('#kbQuery').value.trim();
+  if (!q) return;
+  const btn = $('#kbQueryBtn');
+  kbBusy(btn, 'Mencari…');
+  try {
+    const r = await post('/api/knowledge/search', { q, limit: 10 });
+    const used = r.results.filter((x) => x.used).length;
+    $('#kbHits').innerHTML = '<div class="muted">' + used + ' hasil di atas ambang skor ' + r.threshold + ' (dipakai bot), ' + (r.results.length - used) + ' di bawahnya.</div>' +
+      (r.results.length ? r.results.map((h) => '<div class="hit' + (h.used ? '' : ' below') + '"><div class="score">' + h.score.toFixed(3) + '<small>' + (h.used ? 'dipakai' : 'di bawah ambang') + '</small></div><div>' +
+        (h.type === 'image_asset' ? '<img loading="lazy" src="/api/knowledge/image/' + encodeURIComponent(h.file) + '" alt="">' : '') +
+        '<span class="kind">' + esc(KB_TYPE[h.type] || h.type) + (h.asset_kind ? ' · ' + esc(KB_KIND[h.asset_kind] || h.asset_kind) : '') + (h.category ? ' · ' + esc(h.category.replace(/_/g, ' ')) : '') + '</span>' +
+        (h.type === 'image_asset' ? '<div class="q">' + esc(h.asset_id) + '</div><div class="muted">' + esc(h.caption) + '</div>'
+          : '<div class="q">' + esc(h.question) + '</div><div>' + esc(h.answer) + '</div>' + (h.auto_reply ? '' : '<div class="muted" style="font-size:11.5px">hanya untuk owner (bot tidak mengutip)</div>')) +
+        '</div></div>').join('') : '<div class="empty">Tidak ada hasil.</div>');
+  } catch (err) {
+    $('#kbHits').innerHTML = '<div class="alert err">' + esc(err.message) + '</div>';
+  } finally {
+    kbIdle(btn);
+  }
+}
+
+function kbRenderList() {
+  const d = kb.data;
+  if (!d) return;
+  const q = kb.query.toLowerCase();
+  const rows = d.items.filter((it) => (kb.cat === 'all' || it.category === kb.cat) && (!q || (it.question + ' ' + it.answer).toLowerCase().includes(q)));
+  $('#kbRows').innerHTML = rows.length ? rows.map((it) =>
+    '<tr><td class="q">' + esc(it.question) + '</td><td>' + esc(it.answer) + '</td><td><span class="badge ' + (it.auto_reply ? 'tag-ok' : 'tag-ref') + '">' + esc(it.category || it.type) + '</span>' +
+    (it.auto_reply ? '' : '<div class="muted" style="font-size:11.5px;margin-top:4px">hanya untuk owner</div>') + '</td></tr>').join('')
+    : '<tr><td colspan="3" class="empty">Tidak ada knowledge yang cocok.</td></tr>';
+}
+
+async function loadKnowledge() {
+  try {
+    const d = await api('/api/knowledge');
+    kb.data = d;
+    kb.loaded = true;
+    const t = d.by_type || {};
+    $('#kbKpis').innerHTML = [
+      ['Total knowledge', d.total, d.collection],
+      ['Tanya jawab', t.chat_qa || 0, 'dijawab otomatis'],
+      ['Price list resmi', t.price_list || 0, 'boleh dikutip bot'],
+      ['Referensi harga', t.price_reference || 0, 'hanya untuk owner'],
+      ['Aset gambar', t.image_asset || 0, d.storage_images != null ? d.storage_images + ' gambar di storage' : ''],
+    ].map(([l, v, n]) => '<div class="kpi"><div class="label">' + l + '</div><div class="value">' + fmt.format(v) + '</div><div class="note">' + esc(n) + '</div></div>').join('');
+    $('#kbGallery').innerHTML = d.assets.length ? d.assets.map((a) =>
+      '<div class="asset"><img loading="lazy" src="/api/knowledge/image/' + encodeURIComponent(a.file) + '" alt="' + esc(a.caption) + '"><div class="meta"><span class="kind">' + esc(KB_KIND[a.kind] || a.kind || 'gambar') + '</span><b>' + esc(a.asset_id) + '</b><span class="muted">' + esc(a.caption) + '</span></div></div>').join('')
+      : '<div class="empty">Belum ada aset gambar.</div>';
+    $('#kbCats').innerHTML = '<button class="filter' + (kb.cat === 'all' ? ' active' : '') + '" data-cat="all">Semua</button>' +
+      [...new Set(d.items.map((it) => it.category).filter(Boolean))].sort().map((c) => '<button class="filter' + (kb.cat === c ? ' active' : '') + '" data-cat="' + esc(c) + '">' + esc(c.replace(/_/g, ' ')) + '</button>').join('');
+    kbRenderList();
+  } catch (err) {
+    $('#kbGallery').innerHTML = '<div class="empty">' + esc(err.message) + '</div>';
+    $('#kbRows').innerHTML = '<tr><td colspan="3" class="empty">' + esc(err.message) + '</td></tr>';
+  }
+}
+
+function initKnowledge() {
+  const drop = $('#kbDrop');
+  drop.addEventListener('click', () => $('#kbFiles').click());
+  $('#kbFiles').addEventListener('change', (e) => { kbAddFiles(e.target.files); e.target.value = ''; });
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); kbAddFiles(e.dataTransfer.files); });
+  $('#kbModes').addEventListener('click', (e) => {
+    const m = e.target.closest('.mode');
+    if (!m) return;
+    kb.mode = m.dataset.mode;
+    document.querySelectorAll('#kbModes .mode').forEach((x) => { x.classList.toggle('on', x === m); x.querySelector('input').checked = x === m; });
+    $('#kbConfirmWrap').hidden = kb.mode !== 'replace';
+    kbRenderPreview();
+  });
+  $('#kbImport').addEventListener('click', kbImport);
+  $('#kbPreview').addEventListener('click', kbPreview);
+  $('#kbQueryBtn').addEventListener('click', kbSearch);
+  $('#kbQuery').addEventListener('keydown', (e) => { if (e.key === 'Enter') kbSearch(); });
+  $('#kbSearch').addEventListener('input', (e) => { kb.query = e.target.value; kbRenderList(); });
+  $('#kbCats').addEventListener('click', (e) => {
+    const b = e.target.closest('.filter');
+    if (!b) return;
+    kb.cat = b.dataset.cat;
+    document.querySelectorAll('#kbCats .filter').forEach((x) => x.classList.toggle('active', x === b));
+    kbRenderList();
+  });
+}
+
+/* ---------- Wiring ---------- */
+function switchView(name) {
+  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
+  document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + name));
+  if (name === 'orders' && !state.ordersLoaded) loadOrdersView();
+  if (name === 'knowledge' && !kb.loaded) loadKnowledge();
+  try { localStorage.setItem('wa-dash-view', name); } catch {}
+}
+
+function init() {
+  initKnowledge();
+  $('#datePicker').value = localDate();
+  $('#monthPicker').value = localDate().slice(0, 7);
+  document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => switchView(b.dataset.view)));
+  $('#filters').addEventListener('click', (e) => {
+    const b = e.target.closest('.filter');
+    if (!b) return;
+    state.filter = b.dataset.filter;
+    document.querySelectorAll('.filter').forEach((x) => x.classList.toggle('active', x === b));
+    renderList();
+  });
+  $('#search').addEventListener('input', (e) => { state.query = e.target.value; renderList(); });
+  $('#ticketList').addEventListener('click', (e) => {
+    const item = e.target.closest('.item');
+    if (item) selectTicket(item.dataset.id);
+  });
+  $('#monthPicker').addEventListener('change', () => loadMonth().catch((err) => toast(err.message, 'err')));
+  $('#datePicker').addEventListener('change', () => loadOrders().catch((err) => toast(err.message, 'err')));
+  $('#refreshBtn').addEventListener('click', () => {
+    loadHealth();
+    loadTickets();
+    if (state.ordersLoaded) loadOrdersView();
+    if (kb.loaded) loadKnowledge();
+  });
+
+  let saved = 'tickets';
+  try { saved = localStorage.getItem('wa-dash-view') || 'tickets'; } catch {}
+  switchView(saved);
+  loadHealth().then(loadTickets);
+  setInterval(() => { if (document.visibilityState === 'visible') loadTickets(); }, 30000);
+}
+
+init();
+</script>
+</body>
+</html>

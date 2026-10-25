@@ -1,0 +1,25 @@
+# Instance n8n sandbox untuk uji percakapan. Dipakai bersama compose.yaml:
+#   docker compose --env-file .env -f compose.yaml -f tests/sandbox/compose.test.yaml up -d --no-deps n8n-test
+#
+# - data n8n disalin ke tests/sandbox/n8n_data (bukan ./n8n_data milik instance live)
+# - webhook hanya di 127.0.0.1:5679, tidak lewat ngrok
+# - node WhatsApp pada workflow sandbox diganti HTTP ke mock-whatsapp,
+#   jadi tidak ada pesan yang keluar ke Meta
+services:
+  n8n-test:
+    extends: { file: compose.yaml, service: n8n }
+    restart: "no"
+    depends_on: !reset {}
+    environment:
+      WEBHOOK_URL: http://localhost:5679/
+      N8N_HOST: localhost
+      # Uji model OpenRouter: SANDBOX_LLM=openrouter SANDBOX_OPENROUTER_MODEL=...
+      OPENROUTER_MODEL: ${SANDBOX_OPENROUTER_MODEL:-${OPENROUTER_MODEL:-openai/gpt-4.1-mini}}
+      QDRANT_COLLECTION: ${SANDBOX_QDRANT_COLLECTION:-${QDRANT_COLLECTION:-wa_knowledge}}
+      QDRANT_SCORE_THRESHOLD: ${SANDBOX_QDRANT_SCORE_THRESHOLD:-${QDRANT_SCORE_THRESHOLD:-0.72}}
+      # Database dipakai bersama instance live: impor knowledge sandbox tidak menulis ke bot.knowledge_items
+      KNOWLEDGE_DB_SYNC: ${SANDBOX_KNOWLEDGE_DB_SYNC:-false}
+    ports: !override
+      - "127.0.0.1:5679:5678"
+    volumes: !override
+      - ./tests/sandbox/n8n_data:/home/node/.n8n

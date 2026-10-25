@@ -1,0 +1,14 @@
+.env
+legacy/.env.n8n-existing
+.DS_Store
+*.log
+n8n-data/
+postgres-data/
+qdrant-data/
+backups/
+tests/sandbox/n8n_data/
+# Data runtime n8n (SQLite, credential, aset upload)
+n8n_data/
+# Chat WhatsApp asli pelanggan dan hasil uji yang memuat nomor owner
+knowledge/sources/
+tests/results/

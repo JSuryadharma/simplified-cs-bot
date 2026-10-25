@@ -1,0 +1,193 @@
+# Seluruh sistem dalam satu compose:
+#   n8n · PostgREST · Qdrant · dashboard tiket WA · WhatsApp mock · tunnel ngrok (profile "tunnel")
+#
+# Stack ini adalah aplikasi pendukung untuk SaViOr. Aplikasi web SaViOr dan database
+# PostgreSQL-nya berjalan dari compose sendiri (../GitHub/savior-app/compose.yaml:
+# savior-web + savior-postgres); bot memakai database itu.
+# Skema bot (bot, bot_api, n8n_internal) tinggal di database `savior`.
+#
+#   (cd ../GitHub/savior-app && docker compose up -d)   # SaViOr web + database lebih dulu
+#   cp .env.example .env   # isi nilai "ganti_..."
+#   make db-init           # sekali, untuk database SaViOr baru: buat role + skema bot
+#   make up                # jalankan semua service, tunggu sampai healthy
+#   make backup            # backup database bot + Qdrant + n8n_data ke backups/
+#
+# LM Studio tetap berjalan di host (host.docker.internal:1234).
+
+name: savior-whatsapp-stack
+
+x-n8n-env: &n8n-env
+  # n8n memakai SQLite di ./n8n_data (database.sqlite), jadi setiap perubahan
+  # workflow/credential langsung tersimpan di folder itu.
+  N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?isi N8N_ENCRYPTION_KEY di .env}
+  N8N_HOST: ${N8N_HOST:-localhost}
+  N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
+  WEBHOOK_URL: ${WEBHOOK_URL:-http://localhost:5678/}
+  N8N_SECURE_COOKIE: ${N8N_SECURE_COOKIE:-false}
+  GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Asia/Jakarta}
+  TZ: ${GENERIC_TIMEZONE:-Asia/Jakarta}
+  N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+  N8N_RUNNERS_ENABLED: "true"
+  N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+  NODE_FUNCTION_ALLOW_BUILTIN: crypto
+  N8N_DIAGNOSTICS_ENABLED: "false"
+  N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+  N8N_PERSONALIZATION_ENABLED: "false"
+  N8N_SSRF_PROTECTION_ENABLED: "true"
+  # Aset gambar upload disimpan di ~/.n8n/storage; n8n 2.x memblokir folder .n8n secara default
+  N8N_BLOCK_FILE_ACCESS_TO_N8N_FILES: "false"
+  N8N_RESTRICT_FILE_ACCESS_TO: /home/node/.n8n/storage
+  N8N_SSRF_ALLOWED_HOSTNAMES: qdrant,db-api,mock-whatsapp,host.docker.internal,openrouter.ai
+  # Dibaca workflow lewat $env.*
+  DB_API_URL: http://db-api:3000
+  QDRANT_URL: http://qdrant:6333
+  QDRANT_COLLECTION: ${QDRANT_COLLECTION:-wa_knowledge}
+  QDRANT_SCORE_THRESHOLD: ${QDRANT_SCORE_THRESHOLD:-0.6}
+  LM_STUDIO_BASE_URL: ${LM_STUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
+  LM_STUDIO_API_TOKEN: ${LM_STUDIO_API_TOKEN:-lm-studio}
+  LM_STUDIO_CHAT_MODEL: ${LM_STUDIO_CHAT_MODEL:-qwen/qwen3.5-9b}
+  LM_STUDIO_EMBEDDING_MODEL: ${LM_STUDIO_EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}
+  OPENROUTER_MODEL: ${OPENROUTER_MODEL:-nvidia/nemotron-3-super-120b-a12b:free}
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+  WHATSAPP_API_BASE_URL: http://mock-whatsapp:8080
+  WHATSAPP_GRAPH_VERSION: ${WHATSAPP_GRAPH_VERSION:-v23.0}
+  WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+  WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+  OWNER_PHONE: ${OWNER_PHONE:-}
+  OWNER_NAME: ${OWNER_NAME:-Owner}
+  IMPORT_API_KEY: ${IMPORT_API_KEY:-}
+  DASHBOARD_SEND_SECRET: ${DASHBOARD_SEND_SECRET:-}
+
+services:
+  db-api:
+    image: postgrest/postgrest:v14.12
+    restart: unless-stopped
+    environment:
+      PGRST_DB_URI: postgres://${POSTGRES_USER:-wa_admin}:${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env}@${SAVIOR_DB_HOST:-savior-postgres}:5432/${SAVIOR_DB_NAME:-savior}
+      PGRST_DB_SCHEMAS: bot_api
+      PGRST_DB_ANON_ROLE: n8n_bot
+      PGRST_DB_CHANNEL_ENABLED: "true"
+      PGRST_ADMIN_SERVER_PORT: "3001"     # hanya untuk healthcheck
+      PGRST_ADMIN_SERVER_HOST: localhost
+    networks: [default, savior]
+    ports:
+      - "127.0.0.1:3002:3000"
+    healthcheck:
+      test: ["CMD", "postgrest", "--ready"]
+      interval: 10s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.18.2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333 && printf 'GET /readyz HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 10s
+      retries: 10
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.37.10
+    restart: unless-stopped
+    depends_on:
+      db-api: { condition: service_healthy }
+      qdrant: { condition: service_healthy }
+    environment: *n8n-env
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    ports:
+      - "5678:5678"
+    volumes:
+      - ./n8n_data:/home/node/.n8n     # workflow, credential, aset upload
+      - ./workflows:/workflows:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5678/healthz >/dev/null || exit 1"]
+      interval: 15s
+      retries: 10
+      start_period: 30s
+
+  # Dashboard tiket/order bot WhatsApp
+  wa-dashboard:
+    image: node:22-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: ["node", "server.mjs"]
+    depends_on:
+      db-api: { condition: service_healthy }
+    environment:
+      PORT: "4000"
+      TZ: ${GENERIC_TIMEZONE:-Asia/Jakarta}
+      DB_API_URL: http://db-api:3000
+      LM_STUDIO_BASE_URL: ${LM_STUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
+      LM_STUDIO_API_TOKEN: ${LM_STUDIO_API_TOKEN:-lm-studio}
+      LM_STUDIO_CHAT_MODEL: ${LM_STUDIO_CHAT_MODEL:-qwen/qwen3.5-9b}
+      OWNER_PHONE: ${OWNER_PHONE:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      MOCK_WHATSAPP_URL: http://mock-whatsapp:8080
+      # Balasan owner dikirim lewat webhook n8n (credential "WhatsApp account"), bukan token di .env
+      N8N_SEND_WEBHOOK_URL: http://n8n:5678/webhook/dashboard-send
+      N8N_SEND_SECRET: ${DASHBOARD_SEND_SECRET:-}
+      # Tab Knowledge: impor chat/dataset lewat webhook n8n, gambar disimpan langsung ke storage n8n
+      N8N_IMPORT_WEBHOOK_URL: http://n8n:5678/webhook/admin/import-knowledge
+      IMPORT_API_KEY: ${IMPORT_API_KEY:-}
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-wa_knowledge}
+      STORAGE_DIR: /storage
+      LM_STUDIO_EMBEDDING_MODEL: ${LM_STUDIO_EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}
+      QDRANT_SCORE_THRESHOLD: ${QDRANT_SCORE_THRESHOLD:-0.6}
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./dashboard:/app:ro
+      - ./n8n_data/storage:/storage
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/health >/dev/null || exit 1"]
+      interval: 10s
+      retries: 5
+
+  # Gateway WhatsApp tiruan untuk uji lokal
+  mock-whatsapp:
+    image: node:22-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: ["node", "server.mjs"]
+    environment:
+      PORT: "8080"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./mock-whatsapp/server.mjs:/app/server.mjs:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null || exit 1"]
+      interval: 10s
+      retries: 5
+
+  # Tunnel publik ke n8n (webhook Meta WhatsApp + form upload) memakai domain ngrok
+  # statis, menggantikan `ngrok http 5678` di host. Aktif bila .env berisi
+  # COMPOSE_PROFILES=tunnel. Matikan ngrok di host lebih dulu: satu domain hanya
+  # boleh dipakai satu agent. Inspector: http://localhost:4040
+  tunnel:
+    image: ngrok/ngrok:3.39.8-alpine
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    depends_on:
+      n8n: { condition: service_healthy }
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    command: ["http", "--url=${NGROK_DOMAIN:-}", "n8n:5678", "--log=stdout"]
+    ports:
+      - "127.0.0.1:4040:4040"
+
+# Jaringan compose milik ../GitHub/savior-app (nama default: <folder>_default).
+# db-api memakai jaringan ini untuk menjangkau container savior-postgres.
+networks:
+  savior:
+    external: true
+    name: ${SAVIOR_NETWORK:-savior-app_default}
+
+volumes:
+  qdrant_data:

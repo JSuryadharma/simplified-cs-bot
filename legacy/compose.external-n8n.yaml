@@ -1,0 +1,80 @@
+name: whatsapp-admin-support
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${GENERIC_TIMEZONE:-Asia/Jakarta}
+    ports:
+      - "55432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/001-init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  db-api:
+    image: postgrest/postgrest:v14.12
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      PGRST_DB_SCHEMAS: bot_api
+      PGRST_DB_ANON_ROLE: n8n_bot
+      PGRST_DB_CHANNEL_ENABLED: "true"
+    ports:
+      - "3002:3000"
+
+  qdrant:
+    image: qdrant/qdrant:v1.18.2
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  mock-whatsapp:
+    image: node:22-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: ["node", "server.mjs"]
+    environment:
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./mock-whatsapp/server.mjs:/app/server.mjs:ro
+
+  dashboard:
+    image: node:22-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: ["node", "server.mjs"]
+    environment:
+      PORT: "4000"
+      TZ: ${GENERIC_TIMEZONE:-Asia/Jakarta}
+      DB_API_URL: ${DB_API_URL}
+      LM_STUDIO_BASE_URL: ${LM_STUDIO_BASE_URL}
+      LM_STUDIO_API_TOKEN: ${LM_STUDIO_API_TOKEN}
+      LM_STUDIO_CHAT_MODEL: ${LM_STUDIO_CHAT_MODEL}
+      OWNER_PHONE: ${OWNER_PHONE}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      MOCK_WHATSAPP_URL: ${MOCK_WHATSAPP_URL:-http://host.docker.internal:8080}
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./dashboard:/app:ro
+
+volumes:
+  postgres_data:
+  qdrant_data:

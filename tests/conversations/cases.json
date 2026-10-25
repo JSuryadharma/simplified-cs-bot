@@ -1,0 +1,628 @@
+{
+  "description": "Kasus uji percakapan chatbot WhatsApp SaViOr. Setiap kasus memakai nomor pelanggan uji baru (62899...) agar riwayat tidak bercampur. role=owner dikirim dari OWNER_PHONE (hanya ke sandbox + mock). expect.image: asset_id yang harus dikirim, atau false bila tidak boleh ada gambar.",
+  "cases": [
+    {
+      "id": "C01",
+      "group": "Pelanggan - tanpa gambar",
+      "title": "Tanya profil usaha",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Savior Konveksi itu usaha apa ya kak?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": false,
+        "escalation": false
+      }
+    },
+    {
+      "id": "C02",
+      "group": "Pelanggan - tanpa gambar",
+      "title": "Tanya minimal order",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Kak, minimal order berapa pcs?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": false,
+        "escalation": false
+      }
+    },
+    {
+      "id": "C03",
+      "group": "Pelanggan - tanpa gambar",
+      "title": "Tanya lama pengerjaan",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Kalau pesan seragam, lama pengerjaannya berapa hari?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": false,
+        "escalation": false
+      }
+    },
+    {
+      "id": "C04",
+      "group": "Pelanggan - tanpa gambar",
+      "title": "Tanya cara pemesanan",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Gimana cara pesan custom di sini?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": false,
+        "escalation": false
+      }
+    },
+    {
+      "id": "C05",
+      "group": "Pelanggan - tanpa gambar",
+      "title": "Tanya harga (tidak ada di knowledge)",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Harga kaos cotton combed 30s sablon 1 warna untuk 100 pcs berapa?"
+        }
+      ],
+      "expect": {
+        "customer_reply": false,
+        "image": false,
+        "escalation": true
+      }
+    },
+    {
+      "id": "C06",
+      "group": "Pelanggan - tanpa gambar",
+      "title": "Status pesanan (ada order)",
+      "seed_order": {
+        "status": "diproses",
+        "items": [
+          {
+            "name": "Kaos Panitia Hitam",
+            "qty": 50,
+            "price": 65000
+          }
+        ],
+        "subtotal": 3250000
+      },
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Kak, pesanan saya sudah sampai mana ya?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": false,
+        "escalation": false,
+        "reply_matches": "proses|diproses|produksi"
+      }
+    },
+    {
+      "id": "C07",
+      "group": "Pelanggan - tanpa gambar",
+      "title": "Status pesanan (tidak ada order)",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Pesanan saya sudah dikirim belum? Nomor resinya berapa?"
+        }
+      ],
+      "expect": {
+        "customer_reply": false,
+        "image": false,
+        "escalation": true
+      }
+    },
+    {
+      "id": "C08",
+      "group": "Pelanggan - tanpa gambar",
+      "title": "Sapaan saja",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Halo kak, selamat siang"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": false,
+        "escalation": false,
+        "reply_not_matches": "owner|tiket|dicek"
+      }
+    },
+    {
+      "id": "C09",
+      "group": "Pelanggan - dengan gambar",
+      "title": "Minta contoh jaket varsity",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Boleh lihat contoh jaket varsity yang pernah dibuat?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": [
+          "jaket-varsity-custom",
+          "jaket-varsity-angkatan-navy",
+          "jaket-varsity-foto-produksi"
+        ],
+        "escalation": false
+      }
+    },
+    {
+      "id": "C10",
+      "group": "Pelanggan - dengan gambar",
+      "title": "Minta katalog warna kaos",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Ada katalog pilihan warna kaosnya kak? Kirim gambarnya dong"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": "katalog-warna-kaos-1",
+        "escalation": false
+      }
+    },
+    {
+      "id": "C11",
+      "group": "Pelanggan - dengan gambar",
+      "title": "Minta contoh seragam batik",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Mau lihat contoh seragam batik kombinasi yang pernah dikerjakan"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": [
+          "seragam-batik-biru",
+          "polo-batik-lilac",
+          "polo-salmon-batik"
+        ],
+        "escalation": false
+      }
+    },
+    {
+      "id": "C12",
+      "group": "Pelanggan - dengan gambar",
+      "title": "Minta contoh tote bag",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Bisa bikin tote bag custom? Ada contoh fotonya?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": [
+          "totebag-custom-krem",
+          "tas-spunbond-warna"
+        ],
+        "escalation": false
+      }
+    },
+    {
+      "id": "C13",
+      "group": "Pelanggan - dengan gambar",
+      "title": "Minta contoh seragam kerja merah",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Ada contoh seragam kantor warna merah yang ada bordir logonya?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": [
+          "seragam-montiss-merah",
+          "seragam-kaos-merah-pita"
+        ],
+        "escalation": false
+      }
+    },
+    {
+      "id": "C14",
+      "group": "Pelanggan - dengan gambar",
+      "title": "Dua pesan: jaket angkatan lalu minta gambar",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Kak saya mau bikin jaket angkatan buat sekolah"
+        },
+        {
+          "role": "customer",
+          "text": "Ada contoh gambarnya kak?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": [
+          "jaket-varsity-custom",
+          "jaket-varsity-angkatan-navy",
+          "jaket-varsity-foto-produksi"
+        ],
+        "escalation": false
+      }
+    },
+    {
+      "id": "C15",
+      "group": "Pelanggan - dengan gambar",
+      "title": "Minta contoh topi bordir (ada aset)",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Boleh lihat contoh foto topi bordir yang pernah dibuat?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": "topi-bordir-custom",
+        "escalation": false
+      }
+    },
+    {
+      "id": "C16",
+      "group": "Pelanggan - dengan gambar",
+      "title": "Minta size chart jaket",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Oh, saya mau tau size chart jaket di Savior, apa bisa dibantu kirim?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": "size-chart-jaket",
+        "escalation": false
+      }
+    },
+    {
+      "id": "C17",
+      "group": "Pelanggan - dengan gambar",
+      "title": "Tanya ukuran hoodie (size chart)",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Kak, ukuran hoodie ada apa aja?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": "size-chart-hoodie",
+        "escalation": false
+      }
+    },
+    {
+      "id": "C18",
+      "group": "Pelanggan - dengan gambar",
+      "title": "Minta size chart tanpa sebut produk",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Ada size chart nya kak?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "escalation": false
+      }
+    },
+    {
+      "id": "C19",
+      "group": "Pelanggan - dengan gambar",
+      "title": "Minta gambar yang tidak ada (mug custom)",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Boleh lihat contoh foto mug custom yang pernah dibuat?"
+        }
+      ],
+      "expect": {
+        "customer_reply": false,
+        "image": false,
+        "escalation": true
+      }
+    },
+    {
+      "id": "C20",
+      "group": "Pelanggan - tanpa gambar",
+      "title": "Harga dari price list resmi (lanyard)",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Kak, harga lanyard stopper 2 sisi kalau pesan 40 pcs berapa?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "escalation": false,
+        "reply_matches": "16[.,]?500|16,5"
+      }
+    },
+    {
+      "id": "C21",
+      "group": "Pelanggan - tanpa gambar",
+      "title": "Tanya alamat toko",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Alamat tokonya di mana ya kak?"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "image": false,
+        "escalation": false,
+        "reply_matches": "Agus Salim"
+      }
+    },
+    {
+      "id": "S01",
+      "group": "Owner / penjaga toko",
+      "title": "/pesanan (order hari ini)",
+      "steps": [
+        {
+          "role": "owner",
+          "text": "/pesanan"
+        }
+      ],
+      "expect": {
+        "owner_reply": true,
+        "image": false,
+        "escalation": false,
+        "owner_reply_matches": "pesanan|order"
+      }
+    },
+    {
+      "id": "S02",
+      "group": "Owner / penjaga toko",
+      "title": "/pesanan nomor pelanggan",
+      "seed_order": {
+        "status": "dikirim",
+        "tracking_number": "JNE123TEST",
+        "items": [
+          {
+            "name": "Jaket Varsity Navy",
+            "qty": 30,
+            "price": 185000
+          }
+        ],
+        "subtotal": 5550000
+      },
+      "steps": [
+        {
+          "role": "owner",
+          "text": "/pesanan {{case_phone}}"
+        }
+      ],
+      "expect": {
+        "owner_reply": true,
+        "image": false,
+        "escalation": false,
+        "owner_reply_matches": "{{order_number}}|Jaket Varsity|JNE123TEST"
+      }
+    },
+    {
+      "id": "S03",
+      "group": "Owner / penjaga toko",
+      "title": "/pesanan semua",
+      "steps": [
+        {
+          "role": "owner",
+          "text": "/pesanan semua"
+        }
+      ],
+      "expect": {
+        "owner_reply": true,
+        "image": false,
+        "escalation": false
+      }
+    },
+    {
+      "id": "S04",
+      "group": "Owner / penjaga toko",
+      "title": "Jawab tiket #TKT lalu diteruskan ke pelanggan",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Kak, kalau tambah bordir nama di lengan, biayanya tambah berapa?"
+        },
+        {
+          "role": "owner",
+          "text": "{{ticket}} Bisa kak, bordir nama di lengan tambah Rp10.000 per pcs ya"
+        }
+      ],
+      "expect": {
+        "customer_reply": true,
+        "customer_reply_equals": "Bisa kak, bordir nama di lengan tambah Rp10.000 per pcs ya",
+        "image": false
+      }
+    },
+    {
+      "id": "S05",
+      "group": "Owner / penjaga toko",
+      "title": "/bantuan (daftar perintah owner)",
+      "steps": [
+        {
+          "role": "owner",
+          "text": "/bantuan"
+        }
+      ],
+      "expect": {
+        "owner_reply": true,
+        "image": false,
+        "escalation": false,
+        "owner_reply_matches": "/pesanan"
+      }
+    },
+    {
+      "id": "T01",
+      "group": "Pelanggan - tiket masih terbuka",
+      "title": "Tiket terbuka, lalu tanya minimal order",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Harga kaos cotton combed 30s sablon 1 warna untuk 100 pcs berapa?",
+          "expect": {
+            "escalation": true
+          }
+        },
+        {
+          "role": "customer",
+          "text": "Oh iya kak, minimal order berapa pcs ya?",
+          "expect": {
+            "customer_reply": true,
+            "escalation": false,
+            "image": false
+          }
+        }
+      ],
+      "expect": {}
+    },
+    {
+      "id": "T02",
+      "group": "Pelanggan - tiket masih terbuka",
+      "title": "Tiket terbuka, lalu tanya status pesanan",
+      "seed_order": {
+        "status": "diproses",
+        "items": [
+          {
+            "name": "Kaos Panitia Hitam",
+            "qty": 50,
+            "price": 65000
+          }
+        ],
+        "subtotal": 3250000
+      },
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Harga kaos cotton combed 30s sablon 1 warna untuk 100 pcs berapa?",
+          "expect": {
+            "escalation": true
+          }
+        },
+        {
+          "role": "customer",
+          "text": "Sekalian kak, pesanan saya yang kemarin sudah sampai mana ya?",
+          "expect": {
+            "customer_reply": true,
+            "escalation": false,
+            "reply_matches": "proses|diproses|produksi"
+          }
+        }
+      ],
+      "expect": {}
+    },
+    {
+      "id": "T03",
+      "group": "Pelanggan - tiket masih terbuka",
+      "title": "Tiket terbuka, lalu pertanyaan baru yang perlu owner",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Harga kaos cotton combed 30s sablon 1 warna untuk 100 pcs berapa?",
+          "expect": {
+            "escalation": true
+          }
+        },
+        {
+          "role": "customer",
+          "text": "Satu lagi kak, bisa bayar tempo 30 hari untuk pesanan instansi?",
+          "expect": {
+            "customer_reply": false,
+            "escalation": true,
+            "escalation_matches": "tempo"
+          }
+        }
+      ],
+      "expect": {}
+    },
+    {
+      "id": "T04",
+      "group": "Pelanggan - tiket masih terbuka",
+      "title": "Tiket terbuka, lalu tanya cara pemesanan",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Harga kaos cotton combed 30s sablon 1 warna untuk 100 pcs berapa?",
+          "expect": {
+            "escalation": true
+          }
+        },
+        {
+          "role": "customer",
+          "text": "Kalau mau pesan caranya gimana kak?",
+          "expect": {
+            "customer_reply": true,
+            "escalation": false
+          }
+        }
+      ],
+      "expect": {}
+    },
+    {
+      "id": "T05",
+      "group": "Pelanggan - tiket masih terbuka",
+      "title": "Tiket terbuka, lalu menagih jawaban yang sama",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Harga kaos cotton combed 30s sablon 1 warna untuk 100 pcs berapa?",
+          "expect": {
+            "escalation": true
+          }
+        },
+        {
+          "role": "customer",
+          "text": "Kak, jadi harganya berapa ya? Ditunggu",
+          "expect": {
+            "customer_reply": true,
+            "escalation": false
+          }
+        }
+      ],
+      "expect": {}
+    },
+    {
+      "id": "T06",
+      "group": "Pelanggan - tiket masih terbuka",
+      "title": "Tiket terbuka, lalu cuma menyapa",
+      "steps": [
+        {
+          "role": "customer",
+          "text": "Harga kaos cotton combed 30s sablon 1 warna untuk 100 pcs berapa?",
+          "expect": {
+            "escalation": true
+          }
+        },
+        {
+          "role": "customer",
+          "text": "Halo",
+          "expect": {
+            "customer_reply": true,
+            "escalation": false,
+            "reply_not_matches": "owner|tiket|dicek"
+          }
+        }
+      ],
+      "expect": {}
+    }
+  ]
+}
