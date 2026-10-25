@@ -42,6 +42,9 @@ make db-init                                        # sekali: role + skema bot d
 make up                                             # n8n, PostgREST, Qdrant, dashboard tiket, tunnel
 ```
 
+Langkah lengkap setelah `make up` (cek service, credential n8n, knowledge, webhook Meta, uji):
+[docs/AFTER-UP.md](docs/AFTER-UP.md).
+
 Pindahkan data dari mesin lama: salin folder `n8n_data/` (workflow, credential, aset),
 lalu pulihkan hasil `make backup` (`postgres-all.sql.gz` ke `savior-postgres` sebagai ganti
 `make db-init`, snapshot Qdrant lewat `PUT /collections/<nama>/snapshots/upload`).
