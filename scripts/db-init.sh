@@ -4,8 +4,8 @@
 #
 #   make db-init
 #
-# Membuat role wa_admin (password = POSTGRES_PASSWORD di .env) dan n8n_bot, lalu
-# menjalankan db/*.sql sebagai wa_admin sehingga wa_admin menjadi pemilik skema bot.
+# Membuat role POSTGRES_USER (default wa_admin; password = POSTGRES_PASSWORD) dan n8n_bot, lalu
+# menjalankan db/*.sql sebagai role itu sehingga role itu menjadi pemilik skema bot.
 set -eu
 
 cd "$(dirname "$0")/.."
