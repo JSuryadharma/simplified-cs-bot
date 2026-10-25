@@ -1,5 +1,5 @@
 // Memuat kode bersama (parser ekspor WhatsApp + pembangun dokumen knowledge) sebagai modul ESM.
-// File *.snippet.js yang sama disisipkan ke Code node n8n oleh scripts/apply-knowledge-import.mjs.
+// Isi file *.snippet.js sama dengan Code node impor knowledge di workflow n8n.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';

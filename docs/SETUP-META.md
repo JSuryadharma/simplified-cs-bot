@@ -16,8 +16,7 @@ dengan nama `WhatsApp account`:
 
 Workflow memakai node native `WhatsApp Business Cloud` versi 1.1. Phone Number ID
 sender test yang sedang dipilih adalah `1233522196505651`. Untuk mengganti sender,
-ubah `waPhoneNumberId` pada `scripts/generate-workflows.mjs`, generate ulang workflow,
-lalu impor ulang.
+ubah Phone Number ID pada node pengiriman WhatsApp di editor n8n.
 
 Environment tetap dipakai untuk verifikasi webhook dan identitas owner:
 

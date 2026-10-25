@@ -55,18 +55,7 @@ diulang dengan mengimpor file yang sama (mode Tambah).
 - `scripts/knowledge/wa-parse.snippet.js` — parser ekspor WhatsApp, redaksi data pribadi, pemotongan chat
 - `scripts/knowledge/build.snippet.js` — label, pembangun dokumen/payload, prompt pelabelan
 
-Keduanya dipakai CLI (`scripts/knowledge/index.mjs`) dan disisipkan ke Code node n8n oleh
-`scripts/apply-knowledge-import.mjs`.
-
-## Patch workflow
-
-Urutan (semua idempoten, dijalankan pada hasil export workflow live):
-
-```bash
-node scripts/apply-asset-request-guard.mjs in.json out.json   # size chart/katalog/price list/contoh -> gambar yang cocok
-node scripts/apply-knowledge-guard.mjs out.json out.json      # price_list vs price_reference, penjaga nominal
-node scripts/apply-knowledge-import.mjs out.json out.json     # cabang impor knowledge v2
-node scripts/apply-dashboard-send.mjs out.json out.json       # tetap pertahankan webhook kirim dari dashboard
-```
+Keduanya dipakai CLI (`scripts/knowledge/index.mjs`); isinya sama dengan Code node impor
+knowledge di workflow n8n, jadi ubah keduanya bersamaan.
 
 Sandbox: `SANDBOX_FIX_SCRIPTS=...` dan `SANDBOX_QDRANT_COLLECTION=wa_knowledge_test`.

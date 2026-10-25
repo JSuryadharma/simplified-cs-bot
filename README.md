@@ -65,8 +65,6 @@ lalu pulihkan hasil `make backup` (`postgres-all.sql.gz` ke `savior-postgres` se
 - `make backup`: dump database SaViOr (termasuk skema bot), snapshot Qdrant, dan arsip
   `n8n_data` ke `backups/stack_<waktu>/` tanpa menghentikan service.
 - `make db-migrate FILE=db/00x-....sql`: terapkan file SQL bot baru ke database yang sudah ada.
-- `make db-move`: memindahkan data bot dari postgres lama stack ini (sebelum database
-  digabung ke SaViOr). Tanpa `CONFIRM=ya` hanya cek + backup.
 - Tunnel: hentikan `ngrok` di host sebelum menyalakan service `tunnel`, karena satu domain
   ngrok hanya boleh dipakai satu agent.
 
@@ -226,8 +224,7 @@ compose, tanpa dependency eksternal). Fitur:
   webhook n8n `dashboard-send` (workflow utama, credential "WhatsApp account", dilindungi
   `DASHBOARD_SEND_SECRET`). Tiket baru ditandai selesai dan Q&A disimpan ke knowledge
   setelah WhatsApp mengembalikan ID pesan; bila gagal, tiket tetap terbuka dan error
-  ditampilkan. Tiket selesai punya tombol *Kirim ulang jawaban*. Patch workflow:
-  `node scripts/apply-dashboard-send.mjs <in.json> <out.json>`. Gateway mock hanya dipakai
+  ditampilkan. Tiket selesai punya tombol *Kirim ulang jawaban*. Gateway mock hanya dipakai
   dengan `WA_SEND_MODE=mock`.
 - **Ringkasan order per tanggal** — perbandingan order (judul item, pcs, tipe item,
   nilai) antara tanggal terpilih dan hari sebelumnya.
@@ -265,9 +262,9 @@ Di canvas n8n, setiap kelompok dilengkapi Sticky Note berbahasa Indonesia:
 6. `05 — Upload Knowledge & Aset`
 
 Bagian upload text memakai kembali parser pada alur 03; bagian lain dimulai oleh trigger
-masing-masing. Semuanya berada dalam satu workflow agar hubungan antarfitur mudah dibaca. Workflow JSON dibuat
-dari `scripts/generate-workflows.mjs`. Setelah mengubah generator, jalankan
-`make generate`, `make validate`, lalu impor ulang workflow hasilnya.
+masing-masing. Semuanya berada dalam satu workflow agar hubungan antarfitur mudah dibaca. `workflows/wa-admin-lengkap.json`
+adalah export workflow live. Ubah workflow di editor n8n, lalu simpan export terbarunya
+(`n8n export:workflow --id=WaAdm1nLengkap26`) ke file itu.
 
 ## Produksi
 

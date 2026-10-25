@@ -1,12 +1,8 @@
-.PHONY: generate validate config up down restart ps logs import doctor db-migrate db-init db-move backup
+.PHONY: validate config up down restart ps logs import doctor db-migrate db-init backup
 
 COMPOSE = docker compose --env-file .env
 
-generate:
-	node scripts/generate-workflows.mjs
-
 validate:
-	node scripts/validate-project.mjs
 	docker compose --env-file .env.example config --quiet
 
 config:
@@ -48,10 +44,6 @@ db-init:
 db-migrate:
 	{ echo 'SET ROLE wa_admin;'; cat $(FILE); } | $(SAVIOR_PG)
 	$(COMPOSE) restart db-api
-
-# Pindahkan data bot dari postgres lama stack ke database SaViOr (tanpa CONFIRM=ya: cek + backup)
-db-move:
-	CONFIRM=$(CONFIRM) sh scripts/move-bot-db.sh
 
 # Backup database SaViOr (termasuk skema bot), snapshot Qdrant, dan n8n_data ke backups/stack_<waktu>/
 backup:
