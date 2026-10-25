@@ -1,4 +1,4 @@
-# Seluruh sistem dalam satu compose:
+# Simplified CS Bot: seluruh service bot dalam satu compose:
 #   n8n · PostgREST · Qdrant · dashboard tiket WA · WhatsApp mock · tunnel ngrok (profile "tunnel")
 #
 # Stack ini adalah aplikasi pendukung untuk SaViOr. Aplikasi web SaViOr dan database
@@ -14,7 +14,7 @@
 #
 # Model AI (chat + embedding) dipakai lewat OpenRouter; tidak ada model lokal.
 
-name: savior-whatsapp-stack
+name: simplified-cs-bot
 
 x-n8n-env: &n8n-env
   # n8n memakai SQLite di ./n8n_data (database.sqlite), jadi setiap perubahan
@@ -190,3 +190,4 @@ networks:
 
 volumes:
   qdrant_data:
+    name: savior-whatsapp-stack_qdrant_data   # volume lama dipakai ulang agar knowledge tetap ada

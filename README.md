@@ -1,4 +1,6 @@
-# Admin WhatsApp berbasis n8n + OpenRouter
+# Simplified CS Bot
+
+Chatbot customer service WhatsApp untuk SaViOr konveksi, berbasis n8n + OpenRouter.
 
 Proyek ini menyediakan chatbot admin WhatsApp berbahasa Indonesia yang dapat:
 
