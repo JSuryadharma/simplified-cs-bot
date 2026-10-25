@@ -1,12 +1,11 @@
 // Impor knowledge ke Qdrant (dan opsional ke tabel bot.knowledge_items) dari dataset berlabel.
 //   node scripts/import-knowledge.mjs --dataset knowledge/dataset/savior-knowledge.json \
-//        [--collection wa_knowledge_test] [--replace] [--db] [--dry-run]
+//        [--collection wa_knowledge_test] [--replace] [--dry-run]
 //
-// --replace  hapus SEMUA point di collection (dan knowledge_items bila --db) lalu isi ulang.
+// --replace  hapus SEMUA point di collection lalu isi ulang.
 //            Embedding dibuat lebih dulu; penghapusan baru dilakukan setelah semua embedding berhasil.
-// --db       sinkronkan ke Postgres lewat RPC bot_api.import_knowledge (perlu db/006-knowledge-import.sql).
 // --dry-run  hanya bangun dokumen dan tampilkan ringkasan.
-// Qdrant dan db-api diakses dari host (localhost); embedding lewat OpenRouter.
+// Qdrant diakses dari host (localhost); embedding lewat OpenRouter. Knowledge hanya di Qdrant.
 import fs from 'node:fs';
 import path from 'node:path';
 import { embedTexts, loadEnv, projectRoot } from './lib.mjs';
@@ -18,7 +17,6 @@ const flag = (name) => args.includes(`--${name}`);
 const values = (name) => args.flatMap((a, i) => (a === `--${name}` && args[i + 1] ? [args[i + 1]] : []));
 
 const QDRANT = process.env.QDRANT_HOST_URL || 'http://localhost:6333';
-const DB_API = process.env.DB_API_HOST_URL || 'http://localhost:3002';
 const collection = values('collection')[0] || process.env.QDRANT_COLLECTION || 'wa_knowledge';
 const storage = path.join(projectRoot, 'n8n_data/storage');
 const datasets = values('dataset');
@@ -67,15 +65,3 @@ for (let i = 0; i < points.length; i += 64) {
 const info = await call(`${QDRANT}/collections/${collection}`, 'GET');
 process.stdout.write(`${points.length} point ditulis; total di ${collection}: ${info.result.points_count}\n`);
 
-// 4. Sinkron ke Postgres
-if (flag('db')) {
-  const items = docs.filter((d) => d.payload.content_type !== 'image_asset').map((d) => ({
-    kb_id: d.payload.kb_id, content_type: d.payload.content_type, category: d.payload.category,
-    question: d.payload.question, answer: d.payload.answer, tags: d.payload.tags.split(', ').filter(Boolean),
-  }));
-  const res = await call(`${DB_API}/rpc/import_knowledge`, 'POST', {
-    p_items: items, p_style_profile: merged.style_profile || null, p_replace: flag('replace'),
-    p_source: 'knowledge_dataset', p_source_stats: { datasets: datasets.map((f) => path.basename(f)), points: points.length, by_type: byType },
-  });
-  process.stdout.write(`db: ${JSON.stringify(res)}\n`);
-}

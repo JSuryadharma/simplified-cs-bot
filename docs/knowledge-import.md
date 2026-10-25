@@ -1,6 +1,6 @@
 # Knowledge base: dataset, impor, dan aturan bot
 
-Knowledge bot disimpan di Qdrant (`QDRANT_COLLECTION`, saat ini `wa_knowledge_openrouter`) dan ringkasannya di `bot.knowledge_items`.
+Knowledge bot disimpan di Qdrant (`QDRANT_COLLECTION`, saat ini `wa_knowledge_openrouter`) (tidak ada salinan knowledge di Postgres).
 Setiap point punya label sehingga bot bisa membedakan jenis informasi.
 
 ## Label
@@ -24,7 +24,7 @@ bukti transfer, invoice, dan nomor rekening tidak dimasukkan.
 Impor ulang (ganti semua):
 
 ```bash
-node scripts/import-knowledge.mjs --dataset knowledge/dataset/savior-knowledge.json --replace --db
+node scripts/import-knowledge.mjs --dataset knowledge/dataset/savior-knowledge.json --replace
 # uji dulu ke collection lain:
 node scripts/import-knowledge.mjs --dataset knowledge/dataset/savior-knowledge.json --collection wa_knowledge_test --replace
 ```
@@ -45,7 +45,7 @@ Tab **Knowledge** di dashboard (port 4000):
 5. Gambar disimpan ke `n8n_data/storage` tanpa menimpa file yang sudah ada; chat/dataset dikirim
    ke webhook n8n `POST /webhook/admin/import-knowledge` (header `x-import-key`).
 6. n8n memotong chat, melabeli tiap potongan dengan OpenRouter (jeda 3 detik, retry), menggabungkan
-   dan menghapus duplikat, lalu embed dan menulis ke Qdrant + `bot.knowledge_items`.
+   dan menghapus duplikat, lalu embed dan menulis ke Qdrant.
 
 Model gratis OpenRouter punya limit harian; potongan yang gagal dilaporkan di hasil impor dan bisa
 diulang dengan mengimpor file yang sama (mode Tambah).
@@ -69,6 +69,4 @@ node scripts/apply-knowledge-import.mjs out.json out.json     # cabang impor kno
 node scripts/apply-dashboard-send.mjs out.json out.json       # tetap pertahankan webhook kirim dari dashboard
 ```
 
-Database: `db/006-knowledge-import.sql` (kolom baru + `bot_api.import_knowledge`).
-Sandbox: `SANDBOX_FIX_SCRIPTS=...` dan `SANDBOX_QDRANT_COLLECTION=wa_knowledge_test`; sandbox tidak menulis
-ke `bot.knowledge_items` (`KNOWLEDGE_DB_SYNC=false`).
+Sandbox: `SANDBOX_FIX_SCRIPTS=...` dan `SANDBOX_QDRANT_COLLECTION=wa_knowledge_test`.

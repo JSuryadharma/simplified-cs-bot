@@ -509,15 +509,7 @@ const server = http.createServer(async (req, res) => {
           delivery,
         });
       }
-      if (ticket.status === 'resolved') {
-        await callRpc('log_delivery', {
-          p_phone: ticket.customer_phone,
-          p_text: ticket.owner_answer,
-          p_kind: 'owner_reply_resend',
-          p_ticket_code: ticket.code,
-          p_provider_message_id: delivery.provider_message_id,
-        });
-      } else {
+      if (ticket.status !== 'resolved') {
         await callRpc('complete_owner_reply', { p_ticket_id: ticketId, p_provider_message_id: delivery.provider_message_id });
       }
       return json(res, 200, { ticket_id: ticketId, ticket_code: ticket.code, delivery });

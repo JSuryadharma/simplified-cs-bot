@@ -17,6 +17,16 @@ sini: bot memakai database milik aplikasi web SaViOr (`../GitHub/savior-app/comp
 container `savior-postgres`). Skema bot (`bot`, `bot_api`, `n8n_internal`) disimpan di
 database `savior`, dimiliki role `wa_admin`.
 
+Data bot hanya dua tabel (`db/001-schema.sql`):
+
+- `bot.tickets`: pertanyaan yang dieskalasi ke owner (nomor & nama pelanggan, pertanyaan,
+  jawaban owner, status `waiting_owner` → `owner_replied` → `resolved`).
+- `bot.orders`: order pelanggan (nomor & nama pelanggan, item, total, resi, status).
+
+Keputusan balas/eskalasi dibuat model AI di workflow; database hanya membuka tiket saat
+model memilih eskalasi (`bot_api.open_ticket`). Knowledge disimpan di Qdrant saja, dan
+riwayat chat tidak disimpan. Skema lama ada di `legacy/db/`.
+
 | Service | URL | Isi |
 |---|---|---|
 | n8n | http://localhost:5678 | workflow chatbot; semua data n8n (SQLite, credential, aset) di folder `./n8n_data` |

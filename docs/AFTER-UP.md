@@ -60,7 +60,7 @@ Quick checks:
 ## 3. Load knowledge (first time)
 
 ```bash
-node scripts/import-knowledge.mjs --dataset knowledge/dataset/savior-knowledge.json --db
+node scripts/import-knowledge.mjs --dataset knowledge/dataset/savior-knowledge.json
 ```
 
 More knowledge later: upload chat exports or images through the dashboard's Knowledge tab

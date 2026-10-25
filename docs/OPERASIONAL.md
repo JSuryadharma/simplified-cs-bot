@@ -101,9 +101,8 @@ terlalu umum karena dapat menurunkan akurasi pemilihan aset.
 - Pantau tiket `waiting_owner` yang terlalu lama:
 
   ```bash
-  docker compose --env-file .env exec -T postgres \
-    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
-    "select code, created_at, customer_question from bot.support_tickets where status='waiting_owner' order by created_at;"
+  docker exec savior-postgres psql -U savior -d savior -c \
+    "select code, created_at, customer_question from bot.tickets where status='waiting_owner' order by created_at;"
   ```
 
 - Jalankan `node scripts/doctor.mjs` setelah restart host atau pergantian model.
