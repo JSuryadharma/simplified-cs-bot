@@ -88,7 +88,8 @@ flowchart LR
     LLM -->|tidak cukup| ESC[Eskalasi ke owner]
     ESC --> WAIT[Status waiting_owner]
     WAIT -->|pesan pelanggan tambahan| SILENT[Catat, jangan balas]
-    WAIT -->|#TKT jawaban owner| DIRECT[Teruskan jawaban]
+    DASH[Dashboard tiket] -->|POST owner/command| DIRECT[Teruskan jawaban owner]
+    WAIT --> DASH
     DIRECT --> DB
     DIRECT --> Q
 ```
@@ -150,24 +151,15 @@ Kirim pesan pelanggan:
 node scripts/simulate-inbound.mjs customer 628111111111 "Pesanan saya sudah dikirim belum?"
 ```
 
-Minta ringkasan order sebagai owner:
-
-```bash
-node scripts/simulate-inbound.mjs owner "$OWNER_PHONE" "/pesanan hari_ini"
-```
-
 Lihat pesan keluar yang ditangkap gateway mock:
 
 ```bash
 curl http://localhost:8080/messages
 ```
 
-Untuk menguji eskalasi, kirim pertanyaan yang tidak ada di knowledge. Ambil kode
-`#TKT-XXXXXXXX` dari pesan ke owner, lalu:
-
-```bash
-node scripts/simulate-inbound.mjs owner "$OWNER_PHONE" "#TKT-XXXXXXXX Jawaban yang diteruskan persis ke pelanggan"
-```
+Untuk menguji eskalasi, kirim pertanyaan yang tidak ada di knowledge. Tiket baru muncul
+di dashboard tiket (`http://localhost:4000`); jawab dari sana. Perintah owner lewat
+WhatsApp (`#TKT-…`, `/pesanan`) tidak diproses lagi.
 
 ## Impor gaya chat dan knowledge
 
@@ -223,29 +215,36 @@ Dashboard NodeJS tersedia di `http://localhost:4000` (service `wa-dashboard` pad
 compose, tanpa dependency eksternal). Fitur:
 
 - **Follow-up tiket** — inbox tiket (cari + filter) dengan tampilan percakapan, ringkasan
-  kebutuhan (AI), dan kotak balasan. *Kirim* meneruskan jawaban ke pelanggan lewat
-  webhook n8n `dashboard-send` (workflow utama, credential "WhatsApp account", dilindungi
-  `DASHBOARD_SEND_SECRET`). Tiket baru ditandai selesai dan Q&A disimpan ke knowledge
-  setelah WhatsApp mengembalikan ID pesan; bila gagal, tiket tetap terbuka dan error
-  ditampilkan. Tiket selesai punya tombol *Kirim ulang jawaban*. Gateway mock hanya dipakai
-  dengan `WA_SEND_MODE=mock`.
+  kebutuhan (AI), dan kotak balasan. *Kirim* memanggil endpoint perintah owner di n8n
+  (lihat di bawah). Tiket baru ditandai selesai dan Q&A disimpan ke knowledge setelah
+  WhatsApp mengembalikan ID pesan; bila gagal, tiket tetap terbuka dan error ditampilkan.
+  Tiket selesai punya tombol *Kirim ulang jawaban*.
 - **Ringkasan order per tanggal** — perbandingan order (judul item, pcs, tipe item,
-  nilai) antara tanggal terpilih dan hari sebelumnya.
+  nilai) antara tanggal terpilih dan hari sebelumnya, plus *Ringkasan order oleh AI*
+  (pengganti perintah WhatsApp `/pesanan`).
 - **Total order bulan berjalan** — total order per tanggal, termasuk jumlah yang
   dikonfirmasi pelanggan (ada pesan pelanggan setelah order) dan nilai rupiahnya.
 
 Ikut berjalan dengan `make up`. Database SaViOr baru disiapkan dengan `make db-init`
 (memuat semua file `db/*.sql`); file SQL baru diterapkan dengan `make db-migrate FILE=...`.
 
-## Perintah owner
+## Perintah owner (hanya lewat dashboard)
 
-| Perintah | Fungsi |
-|---|---|
-| `/pesanan` | Ringkasan order hari ini |
-| `/pesanan hari_ini` | Sama dengan `/pesanan` |
-| `/pesanan 628xxx` | Ringkasan order nomor pelanggan |
-| `/pesanan semua` | Ringkasan maksimal 100 order terbaru |
-| `#TKT-XXXXXXXX jawaban` | Teruskan bagian `jawaban` ke pelanggan |
+Owner tidak lagi memberi perintah lewat WhatsApp. Pesan dari `OWNER_PHONE` yang berbentuk
+perintah (`#TKT-…`, `/pesanan`, `/bantuan`) diabaikan workflow. Semua perintah lewat satu
+endpoint terpisah yang dipanggil server dashboard:
+
+`POST /webhook/owner/command` dengan header `x-dashboard-secret: $DASHBOARD_SEND_SECRET`
+
+| `action` | Body | Fungsi |
+|---|---|---|
+| `reply` | `ticket_code`, `text` | Teruskan `text` persis ke pelanggan, tutup tiket, simpan Q&A ke Qdrant |
+| `resend` | `ticket_id` | Kirim ulang jawaban owner yang tersimpan |
+| `orders` | `filter`: `hari_ini`, `semua`, atau `628xxx` | Ringkasan order (AI) dikembalikan sebagai JSON |
+
+Respons: `200` berhasil, `400` payload salah, `401` secret salah, `409` tiket tidak
+ditemukan/sudah selesai, `502` WhatsApp menolak pesan (tiket tetap terbuka).
+Isi `DASHBOARD_PUBLIC_URL` agar pesan eskalasi ke owner memuat link dashboard.
 
 Selama tiket berstatus `waiting_owner` atau `owner_replied`, setiap pesan tambahan
 pelanggan hanya disimpan. Tidak ada pesan tunggu otomatis yang dikirim.

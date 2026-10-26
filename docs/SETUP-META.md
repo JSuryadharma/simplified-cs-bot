@@ -60,13 +60,13 @@ menyentuh database.
 
 ## 3. Uji aman
 
-1. Pastikan keenam node pengiriman menampilkan credential `WhatsApp account`.
+1. Pastikan keempat node pengiriman menampilkan credential `WhatsApp account`.
 2. Kirim pesan dari nomor pelanggan uji ke nomor bisnis.
 3. Periksa execution workflow 02.
 4. Pastikan pesan yang punya knowledge mendapat jawaban.
 5. Kirim pertanyaan baru dan pastikan owner menerima kode tiket.
 6. Sebelum owner menjawab, kirim pesan pelanggan kedua dan pastikan tidak ada balasan.
-7. Jawab dari nomor `OWNER_PHONE` memakai `#TKT-XXXXXXXX jawaban`.
+7. Jawab tiket dari dashboard tiket (balasan `#TKT-…` lewat WhatsApp diabaikan).
 8. Pastikan hanya bagian jawaban yang diteruskan dan tiket menjadi `resolved`.
 
 ## Catatan WhatsApp

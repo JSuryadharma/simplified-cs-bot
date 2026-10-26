@@ -164,6 +164,7 @@
   .orders { width: 100%; overflow-y: auto; }
   .orders-wrap { max-width: 1200px; margin: 0 auto; padding: 20px; display: grid; gap: 16px; }
   .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  #summaryFilter, #summaryPhone { padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px; color: var(--ink); background: var(--panel); }
   .toolbar label { color: var(--muted); font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; }
   .toolbar input {
     padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: var(--panel); color: var(--ink);
@@ -322,6 +323,16 @@
           <div class="chart-box"><canvas id="chartCompare"></canvas></div>
         </div>
       </div>
+      <div class="card">
+        <div class="day-head"><h2>Ringkasan order oleh AI</h2>
+          <div class="btn-row">
+            <select id="summaryFilter"><option value="hari_ini">Hari ini</option><option value="semua">100 order terbaru</option><option value="phone">Nomor pelanggan…</option></select>
+            <input id="summaryPhone" placeholder="628xxx" inputmode="numeric" hidden>
+            <button class="btn ghost sm" id="orderSummaryBtn">Buat ringkasan</button>
+          </div></div>
+        <div class="hint">Pengganti perintah WhatsApp /pesanan. Dibuat di n8n dan hanya tampil di sini.</div>
+        <div id="orderSummary" style="white-space:pre-wrap;font-size:13px;margin-top:8px"></div>
+      </div>
       <div class="grid-half">
         <div class="card" id="colCurrent"><div class="empty">Memuat…</div></div>
         <div class="card" id="colPrevious"><div class="empty">Memuat…</div></div>
@@ -449,14 +460,13 @@ function monthLabel(monthStr) {
 const isOpen = (t) => t.status === 'waiting_owner' || t.status === 'owner_replied';
 
 /* ---------- Health ---------- */
-const CHANNEL_LABEL = { 'n8n-webhook': 'WhatsApp via n8n', 'whatsapp-cloud-api': 'WhatsApp Cloud API', 'mock-whatsapp': 'WhatsApp mock (uji)' };
 async function loadHealth() {
   const el = $('#status');
   try {
     const h = await api('api/health');
     state.health = h;
-    el.classList.toggle('off', !h.wa_configured);
-    $('#statusText').textContent = h.wa_configured ? (CHANNEL_LABEL[h.wa_channel] || 'WhatsApp aktif') : 'Pengiriman WA belum aktif';
+    el.classList.toggle('off', !h.owner_endpoint_configured);
+    $('#statusText').textContent = h.owner_endpoint_configured ? 'WhatsApp via n8n' : 'Pengiriman WA belum aktif';
     el.title = 'Zona waktu ' + (h.timezone || '?');
   } catch {
     el.classList.add('off');
@@ -525,7 +535,7 @@ function renderDetail(t, opts = {}) {
   const draft = opts.keepDraft ? ($('#replyBox')?.value || '') : '';
   const summaryDraft = opts.keepDraft ? $('#summaryBox')?.value : null;
   const open = isOpen(t);
-  const notConfigured = state.health && !state.health.wa_configured;
+  const notConfigured = state.health && !state.health.owner_endpoint_configured;
 
   let chat = '<div class="sys">Tiket #' + esc(t.code) + ' dibuat ' + esc(fmtDate(t.created_at)) + '</div>' +
     '<div class="bubble in"><div class="label">' + esc(t.customer_name) + '</div>' + esc(t.question) + '<div class="stamp">' + esc(fmtDate(t.created_at)) + '</div></div>';
@@ -538,7 +548,7 @@ function renderDetail(t, opts = {}) {
   let composer;
   if (open) {
     composer =
-      (notConfigured ? '<div class="alert warn">Pengiriman WhatsApp dari dashboard belum aktif. Balasan tidak bisa dikirim sampai kanal dikonfigurasi.</div>' : '') +
+      (notConfigured ? '<div class="alert warn">Endpoint perintah owner di n8n belum diatur (N8N_OWNER_WEBHOOK_URL + DASHBOARD_SEND_SECRET). Balasan belum bisa dikirim.</div>' : '') +
       '<div id="sendResult"></div>' +
       '<div class="bar"><textarea id="replyBox" placeholder="Tulis jawaban untuk ' + esc(t.customer_name) + '…">' + esc(draft || (t.status === 'owner_replied' ? t.owner_answer || '' : '')) + '</textarea>' +
       '<button class="btn" id="sendBtn">Kirim</button></div>' +
@@ -733,6 +743,25 @@ async function loadOrdersView() {
     state.ordersLoaded = true;
   } catch (err) {
     toast(err.message, 'err');
+  }
+}
+
+async function loadOrderSummary() {
+  const btn = $('#orderSummaryBtn');
+  const choice = $('#summaryFilter').value;
+  const filter = choice === 'phone' ? $('#summaryPhone').value.replace(/\D/g, '') : choice;
+  if (!filter) return toast('Isi nomor pelanggan terlebih dahulu.', 'err');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Meringkas';
+  try {
+    const r = await post('api/orders/summary', { filter });
+    $('#orderSummary').textContent = r.text || 'Tidak ada ringkasan.';
+  } catch (err) {
+    $('#orderSummary').textContent = '';
+    toast(err.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Buat ringkasan';
   }
 }
 
@@ -989,6 +1018,8 @@ function init() {
   });
   $('#monthPicker').addEventListener('change', () => loadMonth().catch((err) => toast(err.message, 'err')));
   $('#datePicker').addEventListener('change', () => loadOrders().catch((err) => toast(err.message, 'err')));
+  $('#orderSummaryBtn').addEventListener('click', loadOrderSummary);
+  $('#summaryFilter').addEventListener('change', (e) => { $('#summaryPhone').hidden = e.target.value !== 'phone'; });
   $('#refreshBtn').addEventListener('click', () => {
     loadHealth();
     loadTickets();
