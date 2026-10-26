@@ -39,6 +39,6 @@ GRANT n8n_bot TO "$BOT_USER" WITH ADMIN OPTION;
 GRANT CONNECT, CREATE ON DATABASE "$DST_DB" TO "$BOT_USER";
 SET ROLE "$BOT_USER";
 SQL
-  for f in db/*.sql; do echo "\\echo $f"; cat "$f"; echo; done
+  for f in db/*.sql; do printf '\\echo %s\n' "$f"; cat "$f"; echo; done
 } | $PSQL -1
 echo "Skema bot siap di $DST_CONTAINER/$DST_DB."
