@@ -15,7 +15,9 @@ All AI (chat and embeddings) goes through OpenRouter; nothing runs locally. Step
 
    Check: http://localhost:3500 opens the SaViOr login page.
 2. **(first time)** `cp .env.example .env` and fill in every `ganti_...` value, plus
-   `OWNER_PHONE`, `OPENROUTER_API_KEY`, `NGROK_AUTHTOKEN` and `NGROK_DOMAIN`. Keep
+   `OWNER_PHONE` and `OPENROUTER_API_KEY`. WhatsApp tokens are not in `.env`: enter them
+   in n8n (credential `WhatsApp account`). Add `NGROK_AUTHTOKEN`/`NGROK_DOMAIN` only if
+   you use the ngrok tunnel. Keep
    `N8N_ENCRYPTION_KEY` the same as the old machine if you copy `n8n_data/`.
 3. Make sure `OPENROUTER_API_KEY` is valid and has credit. Defaults: chat
    `nvidia/nemotron-3-super-120b-a12b`, embeddings `openai/text-embedding-3-small`.
@@ -74,7 +76,7 @@ added to Qdrant automatically.
    first) or your own HTTPS domain. `WEBHOOK_URL` in `.env` must be that URL.
 2. In Meta for Developers → WhatsApp → Configuration:
    - Callback URL: `https://<your-domain>/webhook/whatsapp`
-   - Verify token: the value of `WHATSAPP_VERIFY_TOKEN`
+   - Verify token: the token you chose for the webhook in n8n
    - Subscribe to the `messages` field.
 
 ## 5. Test end to end
