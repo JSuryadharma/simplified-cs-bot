@@ -1,4 +1,4 @@
-.PHONY: validate config up down restart ps logs import doctor db-migrate db-init backup
+.PHONY: validate config up down restart ps logs import doctor db-migrate db-init backup fix-perms
 
 COMPOSE = docker compose --env-file .env
 
@@ -9,8 +9,15 @@ config:
 	$(COMPOSE) config --quiet
 
 # Build + jalankan seluruh stack, tunggu sampai semua service healthy
+# n8n_data dibuat lebih dulu oleh user ini; kalau dibuat Docker, folder itu milik root dan n8n gagal (EACCES)
 up:
+	mkdir -p n8n_data/storage
 	$(COMPOSE) up -d --build --wait
+
+# Perbaiki pemilik n8n_data untuk user node (uid 1000) di container n8n, tanpa sudo
+fix-perms:
+	mkdir -p n8n_data/storage
+	docker run --rm -v "$(CURDIR)/n8n_data:/data" node:22-alpine chown -R 1000:1000 /data
 
 down:
 	$(COMPOSE) down
