@@ -18,10 +18,9 @@ Workflow memakai node native `WhatsApp Business Cloud` versi 1.1. Phone Number I
 sender test yang sedang dipilih adalah `1233522196505651`. Untuk mengganti sender,
 ubah Phone Number ID pada node pengiriman WhatsApp di editor n8n.
 
-Environment tetap dipakai untuk verifikasi webhook dan identitas owner:
+Environment hanya dipakai untuk tanda tangan webhook (opsional) dan identitas owner:
 
 ```dotenv
-WHATSAPP_VERIFY_TOKEN=...
 WHATSAPP_APP_SECRET=...
 OWNER_PHONE=628...
 ```
@@ -52,7 +51,7 @@ Pastikan workflow 01 dan 02 sudah dipublish. Callback URL:
 https://bot.example.com/webhook/whatsapp
 ```
 
-Masukkan nilai `WHATSAPP_VERIFY_TOKEN` sebagai verify token di Meta, lalu subscribe ke
+Masukkan verify token yang Anda pilih di n8n sebagai verify token di Meta, lalu subscribe ke
 field `messages` untuk WhatsApp Business Account.
 
 Workflow 02 memverifikasi `X-Hub-Signature-256` terhadap raw request body jika
