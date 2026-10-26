@@ -109,6 +109,8 @@ and read the replies with `curl http://localhost:8080/messages`.
   ```
 
 - After a reboot: start SaViOr's compose first, then `make up`.
+- n8n crashes with `EACCES: permission denied, open '/home/node/.n8n/config'` (Linux,
+  when Docker created `n8n_data/` as root): `make fix-perms`, then `make up`.
 
 ## 7. Reverse proxy (nginx) and public URLs
 
