@@ -62,6 +62,8 @@ x-n8n-env: &n8n-env
   OWNER_NAME: ${OWNER_NAME:-Owner}
   IMPORT_API_KEY: ${IMPORT_API_KEY:-}
   DASHBOARD_SEND_SECRET: ${DASHBOARD_SEND_SECRET:-}
+  # Link dashboard tiket di pesan eskalasi ke owner, mis. https://bot.example.com/wa-dashboard/
+  DASHBOARD_PUBLIC_URL: ${DASHBOARD_PUBLIC_URL:-}
 
 services:
   db-api:
@@ -132,13 +134,10 @@ services:
       OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-nvidia/nemotron-3-super-120b-a12b}
-      OWNER_PHONE: ${OWNER_PHONE:-}
-      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
-      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
-      MOCK_WHATSAPP_URL: http://mock-whatsapp:8080
-      # Balasan owner dikirim lewat webhook n8n (credential "WhatsApp account"), bukan token di .env
-      N8N_SEND_WEBHOOK_URL: http://n8n:5678/webhook/dashboard-send
-      N8N_SEND_SECRET: ${DASHBOARD_SEND_SECRET:-}
+      # Jawab tiket, kirim ulang, dan ringkasan order lewat endpoint n8n owner/command
+      # (credential "WhatsApp account"); owner tidak bisa memberi perintah lewat WhatsApp.
+      N8N_OWNER_WEBHOOK_URL: http://n8n:5678/webhook/owner/command
+      DASHBOARD_SEND_SECRET: ${DASHBOARD_SEND_SECRET:-}
       # Tab Knowledge: impor chat/dataset lewat webhook n8n, gambar disimpan langsung ke storage n8n
       N8N_IMPORT_WEBHOOK_URL: http://n8n:5678/webhook/admin/import-knowledge
       IMPORT_API_KEY: ${IMPORT_API_KEY:-}

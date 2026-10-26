@@ -86,9 +86,10 @@ added to Qdrant automatically.
 2. Send a question that is not in the knowledge. The AI escalates: a row appears in
    `bot.tickets`, the owner gets a `#TKT-XXXXXXXX` code, and the ticket shows up at
    http://localhost:4000.
-3. Answer from the dashboard, or from the owner's WhatsApp with `#TKT-XXXXXXXX answer`.
-   The customer receives exactly that answer and the ticket becomes resolved.
-4. From the owner's WhatsApp, `/pesanan` lists today's orders from `bot.orders`.
+3. Answer from the dashboard. The customer receives exactly that answer and the ticket
+   becomes resolved. Owner commands sent over WhatsApp (`#TKT-…`, `/pesanan`) are ignored.
+4. In the dashboard's Order tab, *Ringkasan order oleh AI* summarises orders from
+   `bot.orders` (this replaces the old WhatsApp `/pesanan` command).
 
 The bot does not store chat history, so each message is answered on its own (with the
 customer's orders and open ticket as context).
