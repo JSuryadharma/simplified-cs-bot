@@ -51,7 +51,10 @@ Pastikan workflow 01 dan 02 sudah dipublish. Callback URL:
 https://bot.example.com/webhook/whatsapp
 ```
 
-Masukkan verify token yang Anda pilih di n8n sebagai verify token di Meta, lalu subscribe ke
+Isi verify token di node **Cek Verify Token Meta** pada workflow (ganti
+`GANTI_VERIFY_TOKEN_META`), simpan dan publish workflow, lalu masukkan teks yang sama sebagai
+verify token di Meta. Node itu menjawab `GET /webhook/whatsapp` dengan `hub.challenge`
+saat Meta memverifikasi Callback URL. Setelah itu subscribe ke
 field `messages` untuk WhatsApp Business Account.
 
 Workflow 02 memverifikasi `X-Hub-Signature-256` terhadap raw request body jika
