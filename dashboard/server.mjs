@@ -2,7 +2,6 @@ import http from 'node:http';
 import { readFile, readdir, writeFile, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, basename } from 'node:path';
-import { randomUUID } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 4000);
@@ -12,17 +11,11 @@ const DB_API_URL = (process.env.DB_API_URL || 'http://host.docker.internal:3001'
 const LM_BASE = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/+$/, '');
 const LM_TOKEN = process.env.OPENROUTER_API_KEY || '';
 const LM_CHAT_MODEL = process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3-super-120b-a12b';
-const OWNER_PHONE = process.env.OWNER_PHONE || '';
-const WA_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || '';
-const WA_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
-const WA_GRAPH_VERSION = process.env.WHATSAPP_GRAPH_VERSION || 'v23.0';
-// Gateway mock hanya dipakai bila diminta (WA_SEND_MODE=mock), supaya dashboard live tidak
-// diam-diam "mengirim" ke mock lalu menutup tiket padahal pelanggan tidak menerima apa pun.
-const MOCK_WHATSAPP_URL = process.env.WA_SEND_MODE === 'mock' ? (process.env.MOCK_WHATSAPP_URL || '') : '';
-// Disarankan: kirim lewat webhook n8n yang memakai credential "WhatsApp account",
-// sehingga token Meta hanya tersimpan di n8n.
-const N8N_SEND_WEBHOOK_URL = process.env.N8N_SEND_WEBHOOK_URL || '';
-const N8N_SEND_SECRET = process.env.N8N_SEND_SECRET || '';
+// Semua perintah owner (jawab tiket, kirim ulang, ringkasan order) lewat endpoint n8n
+// owner/command. Endpoint itu memakai credential "WhatsApp account", jadi token Meta hanya
+// tersimpan di n8n, dan owner tidak lagi bisa memberi perintah lewat WhatsApp.
+const N8N_OWNER_WEBHOOK_URL = process.env.N8N_OWNER_WEBHOOK_URL || '';
+const DASHBOARD_SEND_SECRET = process.env.DASHBOARD_SEND_SECRET || '';
 const TZ = process.env.TZ || 'Asia/Jakarta';
 // Impor knowledge: gambar disimpan ke storage n8n (bind mount), chat/dataset diproses webhook n8n.
 const N8N_IMPORT_WEBHOOK_URL = process.env.N8N_IMPORT_WEBHOOK_URL || '';
@@ -124,64 +117,30 @@ async function summarizeWithLm(question, extra = '') {
   return text;
 }
 
-// Nilai contoh di .env (dev-token, demo-...) bukan kredensial Meta sungguhan.
-function looksLikePlaceholder(value) {
-  return !value || /^(dev|demo|test|ganti|changeme|xxx)/i.test(value);
+function ownerEndpointConfigured() {
+  return Boolean(N8N_OWNER_WEBHOOK_URL && DASHBOARD_SEND_SECRET);
 }
 
-function sendChannel() {
-  if (N8N_SEND_WEBHOOK_URL) return 'n8n-webhook';
-  if (!looksLikePlaceholder(WA_ACCESS_TOKEN) && !looksLikePlaceholder(WA_PHONE_NUMBER_ID)) return 'whatsapp-cloud-api';
-  if (MOCK_WHATSAPP_URL) return 'mock-whatsapp';
-  return null;
-}
-
-async function postJson(url, headers, body) {
+// Kirim perintah owner ke n8n. Mengembalikan { status, data } apa adanya supaya kode
+// status n8n (400/401/409/502) diteruskan ke browser.
+async function ownerCommand(body) {
+  if (!ownerEndpointConfigured()) {
+    return { status: 503, data: { error: 'owner_endpoint_not_configured', message: 'Endpoint perintah owner belum diatur: isi N8N_OWNER_WEBHOOK_URL dan DASHBOARD_SEND_SECRET.' } };
+  }
   let res;
   try {
-    res = await fetch(url, {
+    res = await fetch(N8N_OWNER_WEBHOOK_URL, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', ...headers },
+      headers: { 'content-type': 'application/json', 'x-dashboard-secret': DASHBOARD_SEND_SECRET },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(90_000),
     });
   } catch (err) {
-    return { ok: false, data: {}, error: `tidak dapat menghubungi ${new URL(url).host}: ${err.message}` };
+    return { status: 502, data: { error: 'n8n_unreachable', message: `Tidak dapat menghubungi n8n (${new URL(N8N_OWNER_WEBHOOK_URL).host}): ${err.message}` } };
   }
   const data = await res.json().catch(() => ({}));
-  return { ok: res.ok, data, error: res.ok ? null : (data?.error?.message || data?.message || `${res.status} ${res.statusText}`) };
-}
-
-async function sendWhatsApp(to, text) {
-  const channel = sendChannel();
-  let result;
-  if (channel === 'n8n-webhook') {
-    result = await postJson(N8N_SEND_WEBHOOK_URL, N8N_SEND_SECRET ? { 'x-dashboard-secret': N8N_SEND_SECRET } : {}, { to, text });
-  } else if (channel === 'whatsapp-cloud-api') {
-    result = await postJson(
-      `https://graph.facebook.com/${WA_GRAPH_VERSION}/${WA_PHONE_NUMBER_ID}/messages`,
-      { authorization: `Bearer ${WA_ACCESS_TOKEN}` },
-      { messaging_product: 'whatsapp', to, type: 'text', text: { body: text, preview_url: false } },
-    );
-  } else if (channel === 'mock-whatsapp') {
-    result = await postJson(`${MOCK_WHATSAPP_URL.replace(/\/+$/, '')}/messages`, {}, { to, type: 'text', text: { body: text } });
-  } else {
-    return {
-      sent: false,
-      channel: null,
-      provider_message_id: null,
-      error: 'WhatsApp belum dikonfigurasi: isi N8N_SEND_WEBHOOK_URL, atau WHATSAPP_ACCESS_TOKEN + WHATSAPP_PHONE_NUMBER_ID.',
-    };
-  }
-  const providerId = result.data?.messages?.[0]?.id || result.data?.provider_message_id || null;
-  // Tanpa wamid berarti WhatsApp tidak menerima pesan, walaupun HTTP-nya 200.
-  const sent = result.ok && Boolean(providerId);
-  return {
-    sent,
-    channel,
-    provider_message_id: providerId,
-    error: sent ? null : (result.error || 'WhatsApp tidak mengembalikan ID pesan.'),
-  };
+  if (!res.ok && !data.message) data.message = data.error || `${res.status} ${res.statusText}`;
+  return { status: res.status, data };
 }
 
 function dayRange(dateStr) {
@@ -419,8 +378,7 @@ const server = http.createServer(async (req, res) => {
         service: 'wa-dashboard',
         time: new Date().toISOString(),
         timezone: TZ,
-        wa_channel: sendChannel(),
-        wa_configured: sendChannel() !== null,
+        owner_endpoint_configured: ownerEndpointConfigured(),
       });
     }
 
@@ -457,69 +415,24 @@ const server = http.createServer(async (req, res) => {
       const ticket = tickets.find((t) => t.ticket_id === ticketId);
       if (!ticket) return json(res, 404, { error: 'ticket_not_found' });
 
-      const ownerResult = await callRpc('receive_owner', {
-        p_message_id: `dash.${randomUUID()}`,
-        p_phone: OWNER_PHONE,
-        p_text: `#${ticket.code} ${reply}`,
-        p_timestamp: new Date().toISOString(),
-      });
-
-      if (ownerResult?.action !== 'forward_customer') {
-        return json(res, 409, {
-          error: 'ticket_not_forwardable',
-          detail: ownerResult?.action === 'help' ? ownerResult.text : 'Tiket sudah selesai atau tidak ditemukan.',
-        });
-      }
-
-      const delivery = await sendWhatsApp(ownerResult.customer_phone, ownerResult.owner_answer);
-
-      // Tiket hanya ditutup bila WhatsApp benar-benar menerima pesan. Bila gagal, tiket
-      // tetap "owner_replied" sehingga bisa dikirim ulang dari dashboard atau WhatsApp.
-      if (!delivery.sent) {
-        return json(res, 502, {
-          error: 'delivery_failed',
-          message: `Gagal kirim ke pelanggan (${delivery.channel || 'tanpa kanal'}): ${delivery.error}`,
-          ticket_id: ticketId,
-          ticket_code: ownerResult.ticket_code,
-          delivery,
-        });
-      }
-
-      const complete = await callRpc('complete_owner_reply', {
-        p_ticket_id: ownerResult.ticket_id,
-        p_provider_message_id: delivery.provider_message_id,
-      });
-
-      return json(res, 200, {
-        ticket_id: ticketId,
-        ticket_code: ownerResult.ticket_code,
-        customer_phone: ownerResult.customer_phone,
-        delivery,
-        knowledge: complete,
-      });
+      // n8n mengirim jawaban, lalu menutup tiket dan menyimpan Q&A hanya bila WhatsApp
+      // menerima pesan. Bila gagal (502), tiket tetap terbuka dan bisa dikirim lagi.
+      const result = await ownerCommand({ action: 'reply', ticket_code: ticket.code, text: reply });
+      return json(res, result.status, result.data);
     }
 
-    // Kirim ulang jawaban owner untuk tiket yang sudah selesai (mis. tiket yang dulu
-    // ditandai selesai padahal pengirimannya gagal).
+    // Kirim ulang jawaban owner yang sudah tersimpan (mis. pengiriman sebelumnya gagal).
     if (req.method === 'POST' && /^\/api\/tickets\/[^/]+\/resend$/.test(path)) {
       const ticketId = path.split('/')[3];
-      const tickets = await callRpc('dashboard_tickets', {});
-      const ticket = tickets.find((t) => t.ticket_id === ticketId);
-      if (!ticket) return json(res, 404, { error: 'ticket_not_found' });
-      if (!ticket.owner_answer) return json(res, 409, { error: 'no_owner_answer', message: 'Tiket ini belum punya jawaban owner.' });
+      const result = await ownerCommand({ action: 'resend', ticket_id: ticketId });
+      return json(res, result.status, result.data);
+    }
 
-      const delivery = await sendWhatsApp(ticket.customer_phone, ticket.owner_answer);
-      if (!delivery.sent) {
-        return json(res, 502, {
-          error: 'delivery_failed',
-          message: `Gagal kirim ke pelanggan (${delivery.channel || 'tanpa kanal'}): ${delivery.error}`,
-          delivery,
-        });
-      }
-      if (ticket.status !== 'resolved') {
-        await callRpc('complete_owner_reply', { p_ticket_id: ticketId, p_provider_message_id: delivery.provider_message_id });
-      }
-      return json(res, 200, { ticket_id: ticketId, ticket_code: ticket.code, delivery });
+    // Ringkasan order oleh AI (dulu perintah WhatsApp /pesanan).
+    if (req.method === 'POST' && path === '/api/orders/summary') {
+      const body = await readBody(req);
+      const result = await ownerCommand({ action: 'orders', filter: String(body.filter || 'hari_ini').trim() });
+      return json(res, result.status, result.data);
     }
 
     if (req.method === 'GET' && path === '/api/orders') {
