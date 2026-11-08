@@ -34,7 +34,7 @@ logs:
 # Impor + publish ulang workflow gabungan ke n8n, lalu restart agar aktif
 import:
 	$(COMPOSE) exec n8n n8n import:workflow --input=/workflows/wa-admin-lengkap.json
-	$(COMPOSE) exec n8n n8n publish:workflow --id=WaAdm1nLengkap26
+	$(COMPOSE) exec n8n n8n publish:workflow --id=simplified-cs
 	$(COMPOSE) restart n8n
 
 doctor:
