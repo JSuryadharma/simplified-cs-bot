@@ -1,6 +1,9 @@
-.PHONY: validate config up down restart ps logs import doctor db-migrate db-init backup fix-perms
+.PHONY: validate config up down restart ps logs import export-workflow doctor db-migrate db-init backup fix-perms
 
 COMPOSE = docker compose --env-file .env
+# ID workflow di n8n (server: simplified-cs). Override: make export-workflow WORKFLOW_ID=...
+WORKFLOW_ID ?= simplified-cs
+WORKFLOW_FILE = workflows/wa-admin-lengkap.json
 
 validate:
 	docker compose --env-file .env.example config --quiet
@@ -33,9 +36,18 @@ logs:
 
 # Impor + publish ulang workflow gabungan ke n8n, lalu restart agar aktif
 import:
-	$(COMPOSE) exec n8n n8n import:workflow --input=/workflows/wa-admin-lengkap.json
-	$(COMPOSE) exec n8n n8n publish:workflow --id=simplified-cs
+	$(COMPOSE) exec n8n n8n import:workflow --input=/$(WORKFLOW_FILE)
+	$(COMPOSE) exec n8n n8n publish:workflow --id=$(WORKFLOW_ID)
 	$(COMPOSE) restart n8n
+
+# Ekspor workflow terbaru dari n8n ke workflows/wa-admin-lengkap.json (untuk di-commit).
+# Verify token Meta di node "Cek Verify Token Meta" diganti placeholder agar tidak ikut ke repo publik.
+export-workflow:
+	$(COMPOSE) exec -T n8n n8n export:workflow --id=$(WORKFLOW_ID) --output=/tmp/workflow-export.json
+	$(COMPOSE) cp n8n:/tmp/workflow-export.json $(WORKFLOW_FILE).tmp
+	sed -E "s/(WHATSAPP_VERIFY_TOKEN \|\| ')[^']*'/\1GANTI_VERIFY_TOKEN_META'/" $(WORKFLOW_FILE).tmp > $(WORKFLOW_FILE)
+	rm -f $(WORKFLOW_FILE).tmp
+	@echo "Diekspor ke $(WORKFLOW_FILE). Cek 'git diff' sebelum commit."
 
 doctor:
 	node scripts/doctor.mjs
