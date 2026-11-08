@@ -78,6 +78,8 @@ added to Qdrant automatically.
    - Callback URL: `https://<your-domain>/webhook/whatsapp`
    - Verify token: the token you chose for the webhook in n8n
    - Subscribe to the `messages` field.
+3. In Meta → App settings → Basic, set the Privacy Policy URL to
+   `https://<your-domain>/webhook/privacy-policy` (a public HTML page served by the workflow).
 
 ## 5. Test end to end
 
