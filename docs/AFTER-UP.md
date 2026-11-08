@@ -106,6 +106,9 @@ and read the replies with `curl http://localhost:8080/messages`.
 ## 6. Day to day
 
 - `make logs`: follow the logs of every service.
+- `make export-workflow`: save the workflow currently in n8n to `workflows/wa-admin-lengkap.json`
+  (Meta verify token replaced by a placeholder), then review `git diff` and commit. On a
+  machine whose workflow ID is not `simplified-cs`, add `WORKFLOW_ID=...`.
 - `make backup`: back up the SaViOr database (including the bot tables), Qdrant and `n8n_data`.
 - `make db-migrate FILE=...sql`: apply a new bot SQL file; the full schema is `db/001-schema.sql`.
 - Open tickets waiting for the owner:
