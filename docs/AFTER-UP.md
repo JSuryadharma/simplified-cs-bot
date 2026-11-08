@@ -75,8 +75,12 @@ added to Qdrant automatically.
 1. Public URL: either the `tunnel` service (`COMPOSE_PROFILES=tunnel`, stop ngrok on the host
    first) or your own HTTPS domain. `WEBHOOK_URL` in `.env` must be that URL.
 2. In Meta for Developers → WhatsApp → Configuration:
-   - Callback URL: `https://<your-domain>/webhook/whatsapp`
-   - Verify token: the token you chose for the webhook in n8n
+   - Callback URL: `WEBHOOK_URL` + `webhook/whatsapp`, e.g.
+     `https://bot.example.com/n8n/webhook/whatsapp` behind nginx with `N8N_PATH=/n8n/`
+   - Verify token: any text you choose. Put the same text in the n8n node
+     **Cek Verify Token Meta** (replace `GANTI_VERIFY_TOKEN_META`), save and publish the
+     workflow first, then click **Verify and save** in Meta. n8n answers Meta's
+     `GET /webhook/whatsapp?hub.challenge=...` from that node; a wrong token gets 403.
    - Subscribe to the `messages` field.
 3. In Meta → App settings → Basic, set the Privacy Policy URL to
    `https://<your-domain>/webhook/privacy-policy` (a public HTML page served by the workflow).
