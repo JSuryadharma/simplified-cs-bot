@@ -30,7 +30,7 @@ riwayat chat tidak disimpan. Skema lama ada di `legacy/db/`.
 | Service | URL | Isi |
 |---|---|---|
 | n8n | http://localhost:5678 | workflow chatbot; semua data n8n (SQLite, credential, aset) di folder `./n8n_data` |
-| wa-dashboard | http://localhost:4000 | dashboard tiket & order bot WhatsApp |
+| wa-dashboard | http://localhost:4000 (server: https://jsur.site/wa/) | dashboard tiket & order bot WhatsApp |
 | db-api | 127.0.0.1:3002 | PostgREST untuk skema `bot_api`, terhubung ke `savior-postgres` lewat jaringan `savior-app_default` |
 | qdrant | 127.0.0.1:6333 | vector DB knowledge (`/dashboard`) |
 | mock-whatsapp | 127.0.0.1:8080 | gateway WhatsApp tiruan untuk uji lokal |
@@ -212,7 +212,9 @@ Untuk chat, ganti `data_type=text`, tambahkan `owner_name=Savior`, dan upload fi
 ## Dashboard admin
 
 Dashboard NodeJS tersedia di `http://localhost:4000` (service `wa-dashboard` pada
-compose, tanpa dependency eksternal). Fitur:
+compose, tanpa dependency eksternal). Di server, dashboard dilayani nginx di context path
+`/wa` (`https://jsur.site/wa/`, atur lewat `DASHBOARD_BASE_PATH`, lihat
+`docs/nginx.example.conf`). Fitur:
 
 - **Follow-up tiket** — inbox tiket (cari + filter) dengan tampilan percakapan, ringkasan
   kebutuhan (AI), dan kotak balasan. *Kirim* memanggil endpoint perintah owner di n8n

@@ -5,7 +5,7 @@ import { dirname, join, basename } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 4000);
-// Subpath di belakang reverse proxy, mis. "/wa-dashboard". Proxy boleh membuang prefix atau tidak.
+// Subpath di belakang reverse proxy, mis. "/wa". Proxy boleh membuang prefix atau tidak.
 const BASE_PATH = ('/' + (process.env.BASE_PATH || '')).replace(/\/{2,}/g, '/').replace(/\/+$/, '');
 const DB_API_URL = (process.env.DB_API_URL || 'http://host.docker.internal:3001').replace(/\/+$/, '');
 const LM_BASE = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/+$/, '');

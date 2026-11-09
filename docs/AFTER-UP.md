@@ -164,9 +164,13 @@ COMPOSE_PROFILES=
 - Set `N8N_PUBLIC_URL` too if you run the host scripts (`simulate-inbound`, `upsert-order`)
   against the proxied URL.
 
-Hosting the dashboard under a subpath: set `DASHBOARD_BASE_PATH=/wa-dashboard/` and proxy
-`location /wa-dashboard/` to `http://127.0.0.1:4000/`. The dashboard accepts the prefix
-stripped or kept. It has no login of its own, so put basic auth or an IP allowlist on it
+Hosting the dashboard under the `/wa` context path (default since this change): keep
+`DASHBOARD_BASE_PATH=/wa/` and proxy `location /wa/` to `http://127.0.0.1:4000/`, so the
+dashboard is at `https://bot.example.com/wa/` and its API at `/wa/api/...`. All asset,
+API and image URLs in the page are relative, and the server accepts the prefix stripped
+or kept, so direct access on `http://localhost:4000/` keeps working too. Set
+`DASHBOARD_PUBLIC_URL=https://bot.example.com/wa/` so escalation messages link there.
+The dashboard has no login of its own, so put basic auth or an IP allowlist on it
 in nginx. Never proxy PostgREST or Qdrant to the internet: neither has authentication.
 
 Apply changes with `make up` (recreates n8n and the dashboard, which pauses the bot for

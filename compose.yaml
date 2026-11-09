@@ -62,7 +62,7 @@ x-n8n-env: &n8n-env
   OWNER_NAME: ${OWNER_NAME:-Owner}
   IMPORT_API_KEY: ${IMPORT_API_KEY:-}
   DASHBOARD_SEND_SECRET: ${DASHBOARD_SEND_SECRET:-}
-  # Link dashboard tiket di pesan eskalasi ke owner, mis. https://bot.example.com/wa-dashboard/
+  # Link dashboard tiket di pesan eskalasi ke owner, mis. https://bot.example.com/wa/
   DASHBOARD_PUBLIC_URL: ${DASHBOARD_PUBLIC_URL:-}
 
 services:
@@ -127,8 +127,10 @@ services:
       db-api: { condition: service_healthy }
     environment:
       PORT: "4000"
-      # Subpath dashboard di belakang reverse proxy, mis. /wa-dashboard/ (default: root)
-      BASE_PATH: ${DASHBOARD_BASE_PATH:-/}
+      # Context path dashboard di belakang nginx (default /wa/, sama dengan
+      # location /wa/ di docs/nginx.example.conf). Akses langsung tanpa prefix
+      # (http://localhost:4000/) tetap berjalan.
+      BASE_PATH: ${DASHBOARD_BASE_PATH:-/wa/}
       TZ: ${GENERIC_TIMEZONE:-Asia/Jakarta}
       DB_API_URL: http://db-api:3000
       OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
