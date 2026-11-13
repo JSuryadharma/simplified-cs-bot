@@ -15,3 +15,15 @@ Uji dengan perbaikan akses file aset:
 `SANDBOX_BLOCK_N8N_FILES=false SANDBOX_RESTRICT_FILE_ACCESS_TO=/home/node/.n8n/storage bash tests/sandbox/setup.sh`
 
 Hasil tersimpan di `results/` (JSON per run + `report.html`).
+
+## Tes pemecah balasan
+
+Node **Pecah Balasan** (balasan panjang dipecah jadi beberapa chat WhatsApp per kalimat) punya
+tes sendiri yang tidak butuh n8n:
+
+```bash
+node tests/split-reply.test.mjs
+```
+
+Kode node ada di `workflows/snippets/pecah-balasan.js`; kalau file itu diubah, tempel ulang ke
+node "Pecah Balasan" di `workflows/wa-admin-lengkap.json` (atau di editor n8n).
