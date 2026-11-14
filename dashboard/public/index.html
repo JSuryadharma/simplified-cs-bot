@@ -249,6 +249,37 @@
   .hit .q { font-weight: 600; }
   .preview-head { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 14px 0 8px; }
 
+  /* Menu Knowledge: per label + edit */
+  .kbv { display: grid; grid-template-columns: 270px 1fr; width: 100%; height: 100%; min-height: 0; }
+  .label-pane { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 10px 8px; }
+  .label-pane h3 { margin: 6px 8px 8px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .label-btn { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; width: 100%; text-align: left; border: 0; background: none;
+    border-radius: 8px; padding: 8px 10px; cursor: pointer; color: var(--ink); border-left: 3px solid transparent; }
+  .label-btn:hover { background: var(--panel-2); }
+  .label-btn.active { background: var(--accent-soft); border-left-color: var(--accent); }
+  .label-btn .name { font-weight: 600; text-transform: capitalize; }
+  .label-btn .n { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .label-btn small { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; line-height: 1.3; }
+  .kb-main { overflow-y: auto; min-width: 0; }
+  .kb-main .orders-wrap { max-width: 1000px; }
+  .kb-head { display: flex; gap: 12px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; }
+  .kb-head h2 { margin: 0; font-size: 18px; text-transform: capitalize; }
+  .kb-head .muted { font-size: 12.5px; }
+  .kb-head .search { max-width: 300px; }
+  .kb-items { display: grid; gap: 10px; }
+  .kb-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 6px; }
+  .kb-card.editing { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .kb-card .top { display: flex; gap: 10px; align-items: flex-start; }
+  .kb-card .q { font-weight: 700; flex: 1; min-width: 0; }
+  .kb-card .a { white-space: pre-wrap; line-height: 1.45; }
+  .kb-card .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); }
+  .kb-form { display: grid; gap: 10px; }
+  .kb-form label { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+  .kb-form input[type=text], .kb-form select { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; color: var(--ink); background: var(--panel); width: 100%; }
+  .kb-form textarea { min-height: 120px; }
+  .kb-form .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kb-form .check { display: flex; gap: 8px; align-items: center; color: var(--ink); }
+
   @media (max-width: 1100px) {
     .detail-body { grid-template-columns: 1fr; }
     .side { border-left: 0; border-top: 1px solid var(--line); }
@@ -263,6 +294,17 @@
     .back { display: inline-block; }
     .bubble { max-width: 92%; }
     .orders-wrap { padding: 16px; }
+    .kbv { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .label-pane { border-right: 0; border-bottom: 1px solid var(--line); display: flex; gap: 6px; overflow-x: auto; padding: 8px 12px; }
+    .label-pane h3, .label-btn small { display: none; }
+    .label-btn { width: auto; white-space: nowrap; border-left: 0; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; display: flex; }
+    .kb-form .row { grid-template-columns: 1fr; }
+    .tabs { margin-left: 0; overflow-x: auto; min-width: 0; flex: 1; }
+    .tab { white-space: nowrap; }
+    .brand { display: none; }
+    #kbKpis { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    #kbKpis .kpi { padding: 10px 12px; }
+    #kbKpis .kpi .value { font-size: 18px; }
   }
 </style>
 </head>
@@ -273,6 +315,7 @@
     <button class="tab active" data-view="tickets">Tiket <span class="count" id="tabCount"></span></button>
     <button class="tab" data-view="orders">Order</button>
     <button class="tab" data-view="knowledge">Knowledge</button>
+    <button class="tab" data-view="kbimport">Impor &amp; cek</button>
   </nav>
   <div class="spacer"></div>
   <div class="status" id="status" title=""><span class="dot"></span><span id="statusText">menghubungi…</span></div>
@@ -347,7 +390,28 @@
       </div>
     </div>
   </section>
-  <section class="view kb" id="view-knowledge">
+  <section class="view" id="view-knowledge">
+    <div class="kbv">
+      <aside class="label-pane" id="kbvLabels"><div class="empty">Memuat…</div></aside>
+      <div class="kb-main">
+        <div class="orders-wrap">
+          <div class="kpis" id="kbKpis"></div>
+          <div class="kb-head">
+            <div><h2 id="kbvTitle">Semua label</h2><div class="muted" id="kbvDesc"></div></div>
+            <input class="search" id="kbSearch" type="search" placeholder="Cari pertanyaan atau jawaban…">
+          </div>
+          <div class="kb-items" id="kbRows"><div class="empty">Memuat…</div></div>
+          <div class="card" id="kbGalleryCard">
+            <h2>Aset gambar</h2>
+            <div class="hint">Gambar yang bisa dikirim bot saat pelanggan meminta size chart, katalog, price list, atau contoh produk.</div>
+            <div class="gallery" id="kbGallery"><div class="empty">Memuat…</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view kb" id="view-kbimport">
     <div class="orders-wrap">
       <div class="card">
         <h2>Impor knowledge dari chat WhatsApp</h2>
@@ -379,25 +443,6 @@
         <div class="hits" id="kbHits"></div>
       </div>
 
-      <div class="kpis" id="kbKpis"></div>
-
-      <div class="card">
-        <h2>Aset gambar</h2>
-        <div class="hint">Gambar yang bisa dikirim bot saat pelanggan meminta size chart, katalog, price list, atau contoh produk.</div>
-        <div class="gallery" id="kbGallery"><div class="empty">Memuat…</div></div>
-      </div>
-
-      <div class="card">
-        <h2>Knowledge teks</h2>
-        <div class="kb-tools">
-          <input class="search" id="kbSearch" type="search" placeholder="Cari pertanyaan atau jawaban…">
-          <div class="filters" id="kbCats"></div>
-        </div>
-        <div class="table-scroll"><table class="qa-list">
-          <thead><tr><th>Pertanyaan</th><th>Jawaban</th><th>Kategori</th></tr></thead>
-          <tbody id="kbRows"><tr><td colspan="3" class="empty">Memuat…</td></tr></tbody>
-        </table></div>
-      </div>
     </div>
   </section>
 </main>
@@ -768,7 +813,10 @@ async function loadOrderSummary() {
 /* ---------- Knowledge ---------- */
 const KB_TYPE = { chat_qa: 'Tanya jawab', price_list: 'Price list resmi', price_reference: 'Referensi harga (owner)', image_asset: 'Aset gambar' };
 const KB_KIND = { size_chart: 'Size chart', katalog: 'Katalog', price_list: 'Price list', contoh_produk: 'Foto produk', contoh_desain: 'Contoh desain', referensi_model: 'Referensi model', referensi_ukuran: 'Referensi ukuran', referensi_detail: 'Detail' };
-const kb = { files: [], mode: 'append', data: null, cat: 'all', query: '', loaded: false };
+const kb = { files: [], mode: 'append', data: null, cat: 'all', query: '', loaded: false, editing: null, saving: false };
+const KB_TEXT_TYPES = ['chat_qa', 'price_list', 'price_reference'];
+// Label aset gambar yang bukan label knowledge teks
+const KB_EXTRA_LABELS = { contoh: 'Foto contoh produk dan desain' };
 
 function kbAddFiles(list) {
   for (const f of list) if (!kb.files.some((x) => x.name === f.name && x.size === f.size)) kb.files.push(f);
@@ -916,7 +964,8 @@ async function kbSearch() {
         (h.type === 'image_asset' ? '<img loading="lazy" src="api/knowledge/image/' + encodeURIComponent(h.file) + '" alt="">' : '') +
         '<span class="kind">' + esc(KB_TYPE[h.type] || h.type) + (h.asset_kind ? ' · ' + esc(KB_KIND[h.asset_kind] || h.asset_kind) : '') + (h.category ? ' · ' + esc(h.category.replace(/_/g, ' ')) : '') + '</span>' +
         (h.type === 'image_asset' ? '<div class="q">' + esc(h.asset_id) + '</div><div class="muted">' + esc(h.caption) + '</div>'
-          : '<div class="q">' + esc(h.question) + '</div><div>' + esc(h.answer) + '</div>' + (h.auto_reply ? '' : '<div class="muted" style="font-size:11.5px">hanya untuk owner (bot tidak mengutip)</div>')) +
+          : '<div class="q">' + esc(h.question) + '</div><div>' + esc(h.answer) + '</div>' + (h.auto_reply ? '' : '<div class="muted" style="font-size:11.5px">hanya untuk owner (bot tidak mengutip)</div>') +
+            '<div class="btn-row"><button class="btn ghost sm" data-edit="' + esc(h.point_id) + '">Edit di menu Knowledge</button></div>') +
         '</div></div>').join('') : '<div class="empty">Tidak ada hasil.</div>');
   } catch (err) {
     $('#kbHits').innerHTML = '<div class="alert err">' + esc(err.message) + '</div>';
@@ -925,15 +974,130 @@ async function kbSearch() {
   }
 }
 
+const kbLabelName = (id) => id ? id.replace(/_/g, ' ') : 'tanpa label';
+
+function kbLabels() {
+  const d = kb.data;
+  const count = {};
+  for (const it of d.items) count[it.category || ''] = (count[it.category || ''] || 0) + 1;
+  const assetCount = {};
+  for (const a of d.assets) assetCount[a.category || ''] = (assetCount[a.category || ''] || 0) + 1;
+  const known = (d.categories || []).map((c) => c.id);
+  const desc = Object.fromEntries((d.categories || []).map((c) => [c.id, c.description]));
+  const ids = [...known, ...Object.keys(count).filter((c) => !known.includes(c)), ...Object.keys(assetCount).filter((c) => !known.includes(c) && !(c in count))];
+  return ids.map((id) => ({ id, name: kbLabelName(id), description: desc[id] || KB_EXTRA_LABELS[id] || '', items: count[id] || 0, assets: assetCount[id] || 0 }))
+    .filter((l) => l.items || l.assets);
+}
+
+function kbRenderLabels() {
+  const labels = kbLabels();
+  if (kb.cat !== 'all' && !labels.some((l) => l.id === kb.cat)) kb.cat = 'all';
+  const btn = (id, name, n, desc) => '<button class="label-btn' + (kb.cat === id ? ' active' : '') + '" data-cat="' + esc(id) + '"><span class="name">' + esc(name) +
+    '</span><span class="n">' + n + '</span>' + (desc ? '<small>' + esc(desc) + '</small>' : '') + '</button>';
+  $('#kbvLabels').innerHTML = '<h3>Label</h3>' + btn('all', 'Semua label', kb.data.items.length, 'Semua knowledge teks') +
+    labels.map((l) => btn(l.id, l.name, l.items + (l.assets ? ' · ' + l.assets + ' 🖼' : ''), l.description)).join('');
+}
+
+function kbCardView(it) {
+  const tags = String(it.tags || '').split(',').map((t) => t.trim()).filter(Boolean);
+  return '<div class="kb-card" data-pid="' + esc(it.point_id) + '"><div class="top"><div class="q">' + esc(it.question) + '</div>' +
+    '<button class="btn ghost sm" data-act="edit">Edit</button></div>' +
+    '<div class="a">' + esc(it.answer) + '</div>' +
+    '<div class="meta">' + (kb.cat === 'all' ? '<span class="badge ' + (it.auto_reply ? 'tag-ok' : 'tag-ref') + '">' + esc(kbLabelName(it.category)) + '</span>' : '') +
+    '<span>' + esc(KB_TYPE[it.type] || it.type) + '</span>' +
+    (it.auto_reply ? '' : '<span class="badge tag-ref">hanya untuk owner</span>') +
+    ((it.products || []).length ? '<span>· Produk: ' + esc(it.products.join(', ')) + '</span>' : '') +
+    (tags.length ? '<span>· Tag: ' + esc(tags.join(', ')) + '</span>' : '') +
+    (it.edited_at ? '<span>· diedit ' + esc(fmtDate(it.edited_at)) + '</span>' : '') + '</div></div>';
+}
+
+function kbCardEdit(it) {
+  const cats = (kb.data.categories || []).map((c) => c.id);
+  if (it.category && !cats.includes(it.category)) cats.push(it.category);
+  const opt = (v, label, sel) => '<option value="' + esc(v) + '"' + (v === sel ? ' selected' : '') + '>' + esc(label) + '</option>';
+  return '<div class="kb-card editing" data-pid="' + esc(it.point_id) + '"><form class="kb-form">' +
+    '<label>Pertanyaan pelanggan<input type="text" name="question" value="' + esc(it.question) + '" required maxlength="1000"></label>' +
+    '<label>Jawaban<textarea name="answer" required maxlength="6000">' + esc(it.answer) + '</textarea></label>' +
+    '<div class="row"><label>Label<select name="category">' + cats.map((c) => opt(c, kbLabelName(c), it.category)).join('') + '</select></label>' +
+    '<label>Jenis<select name="content_type">' + KB_TEXT_TYPES.map((t) => opt(t, KB_TYPE[t], it.type)).join('') + '</select></label></div>' +
+    '<div class="row"><label>Produk (pisahkan dengan koma)<input type="text" name="products" value="' + esc((it.products || []).join(', ')) + '"></label>' +
+    '<label>Tag (pisahkan dengan koma)<input type="text" name="tags" value="' + esc(it.tags || '') + '"></label></div>' +
+    '<label class="check"><input type="checkbox" name="auto_reply"' + (it.auto_reply ? ' checked' : '') + (it.type === 'price_reference' ? ' disabled' : '') +
+    '> Boleh dijawab bot otomatis <span class="muted">(referensi harga selalu hanya untuk owner)</span></label>' +
+    '<div class="btn-row"><button class="btn" type="submit">Simpan</button><button class="btn ghost" type="button" data-act="cancel">Batal</button>' +
+    '<span class="muted" style="align-self:center;font-size:12px">Disimpan ke Qdrant dengan embedding baru, jadi bot langsung memakai jawaban ini.</span></div>' +
+    '</form></div>';
+}
+
 function kbRenderList() {
   const d = kb.data;
   if (!d) return;
+  const label = kb.cat === 'all' ? null : kbLabels().find((l) => l.id === kb.cat);
+  $('#kbvTitle').textContent = label ? label.name : 'Semua label';
   const q = kb.query.toLowerCase();
-  const rows = d.items.filter((it) => (kb.cat === 'all' || it.category === kb.cat) && (!q || (it.question + ' ' + it.answer).toLowerCase().includes(q)));
-  $('#kbRows').innerHTML = rows.length ? rows.map((it) =>
-    '<tr><td class="q">' + esc(it.question) + '</td><td>' + esc(it.answer) + '</td><td><span class="badge ' + (it.auto_reply ? 'tag-ok' : 'tag-ref') + '">' + esc(it.category || it.type) + '</span>' +
-    (it.auto_reply ? '' : '<div class="muted" style="font-size:11.5px;margin-top:4px">hanya untuk owner</div>') + '</td></tr>').join('')
-    : '<tr><td colspan="3" class="empty">Tidak ada knowledge yang cocok.</td></tr>';
+  const rows = d.items.filter((it) => (kb.cat === 'all' || it.category === kb.cat) && (!q || (it.question + ' ' + it.answer + ' ' + (it.tags || '')).toLowerCase().includes(q)));
+  $('#kbvDesc').textContent = (label?.description ? label.description + ' · ' : '') + rows.length + ' knowledge teks';
+  $('#kbRows').innerHTML = rows.length ? rows.map((it) => (kb.editing === it.point_id ? kbCardEdit(it) : kbCardView(it))).join('')
+    : '<div class="card empty">Tidak ada knowledge yang cocok' + (label && !label.items ? ' (label ini hanya berisi gambar)' : '') + '.</div>';
+  const assets = d.assets.filter((a) => kb.cat === 'all' || a.category === kb.cat);
+  $('#kbGalleryCard').hidden = !assets.length && kb.cat !== 'all';
+  $('#kbGallery').innerHTML = assets.length ? assets.map((a) =>
+    '<div class="asset"><img loading="lazy" src="api/knowledge/image/' + encodeURIComponent(a.file) + '" alt="' + esc(a.caption) + '"><div class="meta"><span class="kind">' + esc(KB_KIND[a.kind] || a.kind || 'gambar') + '</span><b>' + esc(a.asset_id) + '</b><span class="muted">' + esc(a.caption) + '</span></div></div>').join('')
+    : '<div class="empty">Belum ada aset gambar.</div>';
+}
+
+async function kbSave(form) {
+  if (kb.saving) return;
+  const card = form.closest('.kb-card');
+  const pid = card.dataset.pid;
+  const old = kb.data.items.find((x) => String(x.point_id) === pid);
+  const f = new FormData(form);
+  const body = {
+    question: String(f.get('question') || '').trim(), answer: String(f.get('answer') || '').trim(),
+    category: f.get('category'), content_type: f.get('content_type'),
+    products: String(f.get('products') || ''), tags: String(f.get('tags') || ''), auto_reply: form.elements.auto_reply.checked,
+  };
+  if (!body.question || !body.answer) return toast('Pertanyaan dan jawaban wajib diisi.', 'err');
+  const btn = form.querySelector('button[type=submit]');
+  kb.saving = true;
+  kbBusy(btn, 'Menyimpan…');
+  try {
+    const r = await api('api/knowledge/items/' + encodeURIComponent(pid), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const i = kb.data.items.findIndex((x) => String(x.point_id) === pid);
+    if (i >= 0) kb.data.items[i] = { ...kb.data.items[i], ...r.item };
+    kb.editing = null;
+    kbRenderLabels();
+    kbRenderList();
+    const moved = old && old.category !== r.item.category && kb.cat !== 'all' ? ' Dipindah ke label "' + kbLabelName(r.item.category) + '".' : '';
+    toast(r.dataset?.updated ? 'Knowledge tersimpan.' + moved : 'Tersimpan di Qdrant; dataset tidak diubah (' + (r.dataset?.reason || '-') + ').' + moved, r.dataset?.updated ? 'ok' : '');
+  } catch (err) {
+    toast(err.message, 'err');
+    kbIdle(btn);
+  } finally {
+    kb.saving = false;
+  }
+}
+
+// Ada edit yang belum disimpan di kartu yang sedang dibuka?
+function confirmLeave() {
+  const form = $('#kbRows .kb-card.editing form');
+  const it = kb.data?.items.find((x) => x.point_id === kb.editing);
+  if (!form || !it) return true;
+  const dirty = form.elements.question.value.trim() !== it.question || form.elements.answer.value.trim() !== it.answer;
+  return !dirty || window.confirm('Perubahan pada knowledge yang sedang diedit belum disimpan. Buang perubahan?');
+}
+
+function kbOpenEditor(pid) {
+  const it = kb.data?.items.find((x) => String(x.point_id) === String(pid));
+  if (!it) return toast('Knowledge tidak ditemukan. Muat ulang halaman.', 'err');
+  kb.editing = it.point_id;
+  if (kb.cat !== 'all' && kb.cat !== it.category) kb.cat = it.category;
+  kb.query = '';
+  $('#kbSearch').value = '';
+  kbRenderLabels();
+  kbRenderList();
+  $('#kbRows .kb-card.editing')?.scrollIntoView({ block: 'center' });
+  $('#kbRows .kb-card.editing textarea')?.focus({ preventScroll: true });
 }
 
 async function loadKnowledge() {
@@ -941,6 +1105,7 @@ async function loadKnowledge() {
     const d = await api('api/knowledge');
     kb.data = d;
     kb.loaded = true;
+    if (kb.editing && !d.items.some((x) => x.point_id === kb.editing)) kb.editing = null;
     const t = d.by_type || {};
     $('#kbKpis').innerHTML = [
       ['Total knowledge', d.total, d.collection],
@@ -949,15 +1114,12 @@ async function loadKnowledge() {
       ['Referensi harga', t.price_reference || 0, 'hanya untuk owner'],
       ['Aset gambar', t.image_asset || 0, d.storage_images != null ? d.storage_images + ' gambar di storage' : ''],
     ].map(([l, v, n]) => '<div class="kpi"><div class="label">' + l + '</div><div class="value">' + fmt.format(v) + '</div><div class="note">' + esc(n) + '</div></div>').join('');
-    $('#kbGallery').innerHTML = d.assets.length ? d.assets.map((a) =>
-      '<div class="asset"><img loading="lazy" src="api/knowledge/image/' + encodeURIComponent(a.file) + '" alt="' + esc(a.caption) + '"><div class="meta"><span class="kind">' + esc(KB_KIND[a.kind] || a.kind || 'gambar') + '</span><b>' + esc(a.asset_id) + '</b><span class="muted">' + esc(a.caption) + '</span></div></div>').join('')
-      : '<div class="empty">Belum ada aset gambar.</div>';
-    $('#kbCats').innerHTML = '<button class="filter' + (kb.cat === 'all' ? ' active' : '') + '" data-cat="all">Semua</button>' +
-      [...new Set(d.items.map((it) => it.category).filter(Boolean))].sort().map((c) => '<button class="filter' + (kb.cat === c ? ' active' : '') + '" data-cat="' + esc(c) + '">' + esc(c.replace(/_/g, ' ')) + '</button>').join('');
+    kbRenderLabels();
     kbRenderList();
   } catch (err) {
+    $('#kbvLabels').innerHTML = '';
     $('#kbGallery').innerHTML = '<div class="empty">' + esc(err.message) + '</div>';
-    $('#kbRows').innerHTML = '<tr><td colspan="3" class="empty">' + esc(err.message) + '</td></tr>';
+    $('#kbRows').innerHTML = '<div class="card empty">' + esc(err.message) + '</div>';
   }
 }
 
@@ -981,12 +1143,41 @@ function initKnowledge() {
   $('#kbQueryBtn').addEventListener('click', kbSearch);
   $('#kbQuery').addEventListener('keydown', (e) => { if (e.key === 'Enter') kbSearch(); });
   $('#kbSearch').addEventListener('input', (e) => { kb.query = e.target.value; kbRenderList(); });
-  $('#kbCats').addEventListener('click', (e) => {
-    const b = e.target.closest('.filter');
+  $('#kbvLabels').addEventListener('click', (e) => {
+    const b = e.target.closest('.label-btn');
     if (!b) return;
     kb.cat = b.dataset.cat;
-    document.querySelectorAll('#kbCats .filter').forEach((x) => x.classList.toggle('active', x === b));
+    document.querySelectorAll('#kbvLabels .label-btn').forEach((x) => x.classList.toggle('active', x === b));
     kbRenderList();
+    $('.kb-main').scrollTop = 0;
+  });
+  $('#kbRows').addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (!act || kb.saving) return;
+    if (act === 'edit') {
+      if (kb.editing && !confirmLeave()) return;
+      kb.editing = e.target.closest('.kb-card').dataset.pid;
+      const it = kb.data.items.find((x) => String(x.point_id) === kb.editing);
+      if (it) kb.editing = it.point_id;
+    }
+    if (act === 'cancel') kb.editing = null;
+    kbRenderList();
+    if (act === 'edit') $('#kbRows .kb-card.editing textarea')?.focus({ preventScroll: true });
+  });
+  $('#kbRows').addEventListener('submit', (e) => { e.preventDefault(); kbSave(e.target); });
+  $('#kbRows').addEventListener('change', (e) => {
+    // Referensi harga selalu hanya untuk owner
+    if (e.target.name !== 'content_type') return;
+    const box = e.target.form.elements.auto_reply;
+    box.disabled = e.target.value === 'price_reference';
+    if (box.disabled) box.checked = false;
+  });
+  $('#kbRows').addEventListener('keydown', (e) => { if (e.key === 'Escape' && kb.editing && !kb.saving) { kb.editing = null; kbRenderList(); } });
+  $('#kbHits').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-edit]');
+    if (!b) return;
+    switchView('knowledge');
+    kbOpenEditor(b.dataset.edit);
   });
 }
 
@@ -995,7 +1186,7 @@ function switchView(name) {
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + name));
   if (name === 'orders' && !state.ordersLoaded) loadOrdersView();
-  if (name === 'knowledge' && !kb.loaded) loadKnowledge();
+  if ((name === 'knowledge' || name === 'kbimport') && !kb.loaded) loadKnowledge();
   try { localStorage.setItem('wa-dash-view', name); } catch {}
 }
 

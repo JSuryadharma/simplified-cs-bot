@@ -66,9 +66,17 @@ Knowledge lives only in Qdrant:
 node scripts/import-knowledge.mjs --dataset knowledge/dataset/savior-knowledge.json
 ```
 
-More knowledge later: upload chat exports or images through the dashboard's Knowledge tab
+More knowledge later: upload chat exports or images through the dashboard's "Impor & cek" tab
 or the n8n form `/form/admin-upload-knowledge`. Every owner answer to a ticket is also
 added to Qdrant automatically.
+
+To read or fix knowledge, open the dashboard's Knowledge menu: items are grouped by label
+(kategori) and each text item has an Edit button for question, answer, label, type, products
+and tags. Saving re-embeds that item and overwrites the same Qdrant point, so the bot uses
+the new answer right away. The edit is also written to `knowledge/dataset/savior-knowledge.json`
+(mounted into the dashboard as `/dataset`, setting `KNOWLEDGE_DATASET_PATH`) so a later
+dataset import keeps it; commit that file if you want the edit in git. Items that came from
+a chat import are not in the dataset and are saved in Qdrant only.
 
 ## 4. Connect WhatsApp (first time, or when the domain changes)
 
