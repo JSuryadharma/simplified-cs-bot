@@ -1,6 +1,6 @@
 {
   "schema": "savior-knowledge/v1",
-  "version": "2026-10-04",
+  "version": "2026-11-09",
   "description": "Knowledge base chatbot WhatsApp SaViOr Konveksi, dikurasi dari 5 ekspor chat WhatsApp (Des 2024 - Jun 2026) dan gambar di n8n_data/storage. Data pribadi pelanggan (nama, alamat, nomor HP, bukti transfer, invoice) dan nomor rekening tidak dimasukkan.",
   "sources": [
     { "chat": "Pelanggan 1", "file": "Chat WhatsApp dengan Pelanggan 1.txt", "period": "2025-04 s/d 2026-06", "topics": ["kaos seragam komunitas", "polo kombinasi batik", "tas spunbond", "pengiriman Papua"] },
@@ -9,7 +9,7 @@
     { "chat": "Pelanggan 4", "file": "Chat WhatsApp dengan Pelanggan 4.txt", "period": "2026-06", "topics": ["apron", "sample", "pengiriman Paxel/kereta"] },
     { "chat": "Pelanggan 5", "file": "Chat WhatsApp dengan Pelanggan 5.txt", "period": "2026-04 s/d 2026-06", "topics": ["produksi borongan", "label satin", "pembayaran bertahap"] }
   ],
-  "style_profile": "Owner (Bu Debi / admin SaViOr) membalas singkat, hangat, dan santai. Sapaan sesuai waktu: \"pagi..\", \"siang kak..\", \"sore bu..\"; panggil \"kak\" untuk pelanggan muda/umum, \"bu\"/\"pak\" untuk pelanggan yang lebih tua. Sering membuka dengan \"baik..\" atau \"iya bisa kak..\" lalu langsung ke inti. Kalimat pendek, sering diakhiri titik dua (..), memakai singkatan chat (y, yg, bs, dl, brp, ny, sdh) tetapi tetap jelas. Emoji secukupnya: 🤗 🙏🏻. Harga ditulis berbentuk daftar per ukuran (\"uk S, M : 65rb\"). Bila belum pasti, owner berkata akan mengecek/menghitungkan dulu, bukan menebak. Selalu menanyakan detail yang dibutuhkan untuk produksi: model, jenis kain, warna, sablon/bordir, jumlah per ukuran, dan tanggal dibutuhkan. Tidak menyebut AI atau sistem.",
+  "style_profile": "Admin SaViOr membalas singkat, hangat, dan santai. Sapaan sesuai waktu: \"pagi kak..\", \"siang kak..\", \"sore kak..\"; panggilan default \"kak\", \"bu\"/\"pak\" hanya bila pelanggan jelas menyebut dirinya begitu. Sering membuka dengan \"baik..\" atau \"iya bisa kak..\" lalu langsung ke inti. Kalimat pendek, sering diakhiri titik dua (..), memakai singkatan chat (y, yg, bs, dl, brp, ny, sdh) tetapi tetap jelas. Emoji secukupnya: 🤗 🙏🏻. Harga ditulis berbentuk daftar per ukuran (\"uk S, M : 65rb\"). Bila belum pasti, owner berkata akan mengecek/menghitungkan dulu, bukan menebak. Selalu menanyakan detail yang dibutuhkan untuk produksi: model, jenis kain, warna, sablon/bordir, jumlah per ukuran, dan tanggal dibutuhkan. Tidak menyebut AI atau sistem.",
   "categories": {
     "profil_usaha": "Siapa SaViOr, produk dan layanan",
     "operasional": "Alamat, jam buka, kunjungan toko",
@@ -102,6 +102,28 @@
       "tags": ["penawaran", "estimasi harga", "info order", "budget"],
       "auto_reply": true,
       "sources": ["Pelanggan 3", "Pelanggan 1", "Pelanggan 4"]
+    },
+    {
+      "id": "mau-order-umum",
+      "content_type": "chat_qa",
+      "category": "proses_order",
+      "products": [],
+      "question": "Saya mau order / pesan, bisa?",
+      "answer": "Bisa kak. Kami menerima pesanan custom kaos, kemeja/seragam, jaket, hoodie/sweater/crewneck, jersey, apron, topi, tote bag, lanyard, dan ID card. Boleh infokan produk yang mau dibuat, model, bahan, warna, sablon atau bordir, jumlah per ukuran, dan tanggal dibutuhkan, nanti kami bantu hitungkan.",
+      "tags": ["mau order", "mau pesan", "bisa pesan", "bisa bikin", "order custom"],
+      "auto_reply": true,
+      "sources": ["Pelanggan 1", "Pelanggan 2", "Pelanggan 3"]
+    },
+    {
+      "id": "mau-order-jaket",
+      "content_type": "chat_qa",
+      "category": "proses_order",
+      "products": ["jaket", "varsity", "bomber"],
+      "question": "Saya mau order jaket, bisa?",
+      "answer": "Bisa kak. Kami mengerjakan jaket custom: varsity (fleece, lengan fleece atau kulit sintetis), bomber (taslan milky dengan furing), dan work jacket (kanvas dengan furing asahi). Untuk rib custom jaket varsity minimal 30 pcs; untuk jumlah lain silakan infokan, nanti kami cek. Supaya bisa kami hitungkan, mohon infokan model jaket, bahan, warna, sablon atau bordir beserta posisinya, jumlah per ukuran, dan tanggal dibutuhkan.",
+      "tags": ["mau order jaket", "pesan jaket", "bikin jaket", "jaket custom", "varsity", "bomber", "work jacket"],
+      "auto_reply": true,
+      "sources": ["Pelanggan 2"]
     },
     {
       "id": "harga-tergantung",
