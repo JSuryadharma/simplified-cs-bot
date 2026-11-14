@@ -2,6 +2,7 @@ import http from 'node:http';
 import { readFile, readdir, writeFile, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, basename } from 'node:path';
+import { KB_CATEGORIES, KB_CATEGORY_LABELS, buildEdit, applyEditToDataset, formatDataset } from './knowledge-edit.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 4000);
@@ -25,6 +26,9 @@ const QDRANT_COLLECTION = process.env.QDRANT_COLLECTION || 'wa_knowledge';
 const STORAGE_DIR = process.env.STORAGE_DIR || '';
 const LM_EMBED_MODEL = process.env.OPENROUTER_EMBEDDING_MODEL || 'openai/text-embedding-3-small';
 const SCORE_THRESHOLD = Number(process.env.QDRANT_SCORE_THRESHOLD || 0.6);
+// Dataset JSON (knowledge/dataset/*.json) yang ikut diperbarui saat knowledge diedit, supaya
+// impor ulang dataset tidak menimpa hasil edit. Kosong = edit hanya tersimpan di Qdrant.
+const KNOWLEDGE_DATASET_PATH = process.env.KNOWLEDGE_DATASET_PATH || '';
 const IMAGE_FILE = /^[\w .()+-]{1,180}\.(jpe?g|png|webp)$/i;
 
 const STATUS_LABELS = {
@@ -246,15 +250,93 @@ async function knowledgeSummary() {
     byType[type] = (byType[type] || 0) + 1;
     if (pl.category) byCategory[pl.category] = (byCategory[pl.category] || 0) + 1;
     if (type === 'image_asset') {
-      assets.push({ asset_id: pl.asset_id, file: pl.original_file_name, kind: pl.asset_kind || '', caption: pl.asset_caption || pl.asset_description || '', products: pl.produk || '' });
+      assets.push({ asset_id: pl.asset_id, category: pl.category || '', file: pl.original_file_name, kind: pl.asset_kind || '', caption: pl.asset_caption || pl.asset_description || '', products: pl.produk || '' });
     } else {
-      items.push({ id: pl.kb_id || p.id, type, category: pl.category || '', question: pl.question || '', answer: pl.answer || pl.text || '', auto_reply: pl.auto_reply !== false && type !== 'price_reference', valid_from: pl.valid_from || '', source: pl.source || '' });
+      items.push({ id: pl.kb_id || p.id, point_id: p.id, type, category: pl.category || '', question: pl.question || '', answer: pl.answer || pl.text || '',
+        auto_reply: pl.auto_reply !== false && type !== 'price_reference', products: Array.isArray(pl.products) ? pl.products : [],
+        tags: String(pl.tags || ''), valid_from: pl.valid_from || '', source: pl.source || '', edited_at: pl.edited_at || '' });
     }
   }
   items.sort((a, b) => (a.category + a.question).localeCompare(b.category + b.question));
   assets.sort((a, b) => (a.kind + a.asset_id).localeCompare(b.kind + b.asset_id));
   const files = await listStorageFiles();
-  return { collection: QDRANT_COLLECTION, total: points.length, by_type: byType, by_category: byCategory, items, assets, storage_images: files ? files.length : null };
+  return { collection: QDRANT_COLLECTION, total: points.length, by_type: byType, by_category: byCategory, items, assets,
+    storage_images: files ? files.length : null, categories: await categoryLabels(), dataset_editable: Boolean(KNOWLEDGE_DATASET_PATH) };
+}
+
+async function readDataset() {
+  if (!KNOWLEDGE_DATASET_PATH) return null;
+  try { return JSON.parse(await readFile(KNOWLEDGE_DATASET_PATH, 'utf8')); } catch { return null; }
+}
+
+async function categoryLabels() {
+  const fromDataset = (await readDataset())?.categories || {};
+  return KB_CATEGORIES.map((id) => ({ id, label: id.replace(/_/g, ' '), description: fromDataset[id] || KB_CATEGORY_LABELS[id] || '' }));
+}
+
+async function embedText(text) {
+  let data;
+  try {
+    const res = await fetch(`${LM_BASE}/embeddings`, {
+      method: 'POST', headers: { authorization: `Bearer ${LM_TOKEN}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ model: LM_EMBED_MODEL, input: [text] }), signal: AbortSignal.timeout(30_000),
+    });
+    data = await res.json();
+    if (!res.ok) throw new Error(data?.error?.message || res.status);
+  } catch (err) {
+    throw new Error(`Embedding OpenRouter gagal (${LM_BASE}): ${err.message}`);
+  }
+  const vector = data.data?.[0]?.embedding;
+  if (!Array.isArray(vector)) throw new Error('Embedding OpenRouter kosong.');
+  return vector;
+}
+
+// Tulis dataset satu per satu supaya dua edit bersamaan tidak saling menimpa.
+let datasetQueue = Promise.resolve();
+function updateDataset(kbId, fields) {
+  const run = datasetQueue.then(async () => {
+    const dataset = await readDataset();
+    if (!dataset) return { updated: false, reason: 'dataset tidak terpasang' };
+    if (!applyEditToDataset(dataset, kbId, fields)) return { updated: false, reason: 'item tidak ada di dataset (mis. hasil impor chat)' };
+    // writeFile di tempat (bukan rename) supaya pemilik/izin file di host tetap
+    await writeFile(KNOWLEDGE_DATASET_PATH, formatDataset(dataset));
+    return { updated: true };
+  });
+  datasetQueue = run.catch(() => {});
+  return run;
+}
+
+// Edit knowledge teks: hitung ulang embedding lalu timpa point yang sama (id tetap, jadi
+// bot langsung memakai jawaban baru), kemudian perbarui dataset JSON bila terpasang.
+async function updateKnowledgeItem(pointId, body) {
+  if (!QDRANT_URL) return { status: 503, data: { error: 'QDRANT_URL belum diatur untuk dashboard.' } };
+  const base = `${QDRANT_URL}/collections/${QDRANT_COLLECTION}/points`;
+  const got = await fetch(`${base}/${encodeURIComponent(pointId)}`, { signal: AbortSignal.timeout(20_000) });
+  const gotData = await got.json().catch(() => ({}));
+  if (got.status === 404 || !gotData.result) return { status: 404, data: { error: 'Knowledge tidak ditemukan. Muat ulang halaman.' } };
+  if (!got.ok) throw new Error(`Qdrant: ${gotData?.status?.error || got.status}`);
+  const edit = buildEdit(body, gotData.result.payload || {});
+  if (edit.error) return { status: 400, data: { error: edit.error } };
+  const vector = await embedText(edit.text);
+  const put = await fetch(`${base}?wait=true`, {
+    method: 'PUT', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ points: [{ id: gotData.result.id, vector, payload: edit.payload }] }),
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!put.ok) {
+    const err = await put.json().catch(() => ({}));
+    throw new Error(`Qdrant: ${err?.status?.error || put.status}`);
+  }
+  const kbId = String(edit.payload.kb_id || '');
+  let dataset = { updated: false, reason: 'dataset tidak terpasang' };
+  if (KNOWLEDGE_DATASET_PATH && kbId) {
+    try { dataset = await updateDataset(kbId, edit.fields); } catch (err) { dataset = { updated: false, reason: err.message }; }
+  }
+  const pl = edit.payload;
+  return { status: 200, data: { ok: true, dataset, item: {
+    id: kbId || gotData.result.id, point_id: gotData.result.id, type: pl.content_type, category: pl.category, question: pl.question, answer: pl.answer,
+    auto_reply: pl.auto_reply, products: pl.products, tags: pl.tags, valid_from: pl.valid_from || '', source: pl.source || '', edited_at: pl.edited_at,
+  } } };
 }
 
 // Panggil webhook n8n tanpa batas waktu fetch bawaan (pelabelan chat bisa memakan beberapa menit)
@@ -324,20 +406,10 @@ async function searchKnowledge(q, limit) {
   if (!QDRANT_URL) throw new Error('QDRANT_URL belum diatur untuk dashboard.');
   const text = String(q || '').trim();
   if (!text) throw new Error('Isi pertanyaan yang mau dicek.');
-  let emb;
-  try {
-    const res = await fetch(`${LM_BASE}/embeddings`, {
-      method: 'POST', headers: { authorization: `Bearer ${LM_TOKEN}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ model: LM_EMBED_MODEL, input: [text] }), signal: AbortSignal.timeout(30_000),
-    });
-    emb = await res.json();
-    if (!res.ok) throw new Error(emb?.error?.message || res.status);
-  } catch (err) {
-    throw new Error(`Embedding OpenRouter gagal (${LM_BASE}): ${err.message}`);
-  }
+  const vector = await embedText(text);
   const res = await fetch(`${QDRANT_URL}/collections/${QDRANT_COLLECTION}/points/query`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ query: emb.data?.[0]?.embedding, limit: Math.min(Number(limit) || 10, 30), with_payload: true }),
+    body: JSON.stringify({ query: vector, limit: Math.min(Number(limit) || 10, 30), with_payload: true }),
     signal: AbortSignal.timeout(20_000),
   });
   const data = await res.json().catch(() => ({}));
@@ -346,7 +418,7 @@ async function searchKnowledge(q, limit) {
     query: text, threshold: SCORE_THRESHOLD, collection: QDRANT_COLLECTION,
     results: (data.result?.points || []).map((p) => {
       const pl = p.payload || {};
-      return { score: p.score, used: p.score >= SCORE_THRESHOLD, type: pl.content_type || 'chat_qa', category: pl.category || '', kb_id: pl.kb_id || pl.asset_id || String(p.id),
+      return { score: p.score, used: p.score >= SCORE_THRESHOLD, type: pl.content_type || 'chat_qa', category: pl.category || '', kb_id: pl.kb_id || pl.asset_id || String(p.id), point_id: p.id,
         question: pl.question || '', answer: pl.answer || '', auto_reply: pl.auto_reply !== false && pl.content_type !== 'price_reference',
         asset_id: pl.asset_id || '', file: pl.original_file_name || '', asset_kind: pl.asset_kind || '', caption: pl.asset_caption || pl.asset_description || '' };
     }),
@@ -484,6 +556,13 @@ const server = http.createServer(async (req, res) => {
       } catch (err) {
         return json(res, 400, { error: err.message });
       }
+    }
+
+    if (req.method === 'PUT' && /^\/api\/knowledge\/items\/[^/]+$/.test(path)) {
+      const pointId = decodeURIComponent(path.split('/')[4]);
+      if (!/^[0-9a-f-]{36}$|^\d+$/i.test(pointId)) return json(res, 400, { error: 'id knowledge tidak valid' });
+      const result = await updateKnowledgeItem(/^\d+$/.test(pointId) ? Number(pointId) : pointId, await readBody(req));
+      return json(res, result.status, result.data);
     }
 
     if (req.method === 'POST' && path === '/api/knowledge/import') {

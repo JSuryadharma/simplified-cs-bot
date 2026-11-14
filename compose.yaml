@@ -148,12 +148,16 @@ services:
       STORAGE_DIR: /storage
       OPENROUTER_EMBEDDING_MODEL: ${OPENROUTER_EMBEDDING_MODEL:-openai/text-embedding-3-small}
       QDRANT_SCORE_THRESHOLD: ${QDRANT_SCORE_THRESHOLD:-0.55}
+      # Menu Knowledge: edit pertanyaan/jawaban/label ikut ditulis ke dataset ini supaya
+      # impor ulang dataset tidak menimpa hasil edit. Kosongkan untuk hanya menyimpan ke Qdrant.
+      KNOWLEDGE_DATASET_PATH: ${KNOWLEDGE_DATASET_PATH-/dataset/savior-knowledge.json}
     extra_hosts: ["host.docker.internal:host-gateway"]
     ports:
       - "${DASHBOARD_BIND:-0.0.0.0}:${DASHBOARD_PORT:-4000}:4000"
     volumes:
       - ./dashboard:/app:ro
       - ./n8n_data/storage:/storage
+      - ./knowledge/dataset:/dataset
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/health >/dev/null || exit 1"]
       interval: 10s
