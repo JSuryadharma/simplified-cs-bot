@@ -137,6 +137,28 @@
     font: inherit; color: var(--ink); background: var(--panel); resize: vertical;
   }
   .side textarea { min-height: 90px; font-size: 13px; }
+  .bubble.cont { border-top-left-radius: 10px; margin-top: -6px; }
+
+  /* Rekomendasi knowledge (ungu neon) */
+  .recs {
+    --neon: #b026ff; --neon-soft: #f5e8ff; --neon-ink: #6b00b8;
+    border: 1.5px solid var(--neon); border-radius: 12px; padding: 12px; background: linear-gradient(180deg, #fbf5ff, #ffffff);
+    box-shadow: 0 0 0 1px rgba(176,38,255,0.15), 0 0 14px rgba(176,38,255,0.35);
+  }
+  .side .recs h3 { color: var(--neon-ink); display: flex; align-items: center; gap: 6px; }
+  .recs h3 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--neon); box-shadow: 0 0 8px var(--neon); }
+  .recs .rec { border: 1px solid rgba(176,38,255,0.35); border-radius: 9px; padding: 8px 10px; background: #fff; display: grid; gap: 4px; font-size: 12.5px; }
+  .recs .rec + .rec { margin-top: 8px; }
+  .recs .rec .top { display: flex; gap: 6px; align-items: baseline; }
+  .recs .rec .q { font-weight: 700; flex: 1; min-width: 0; }
+  .recs .rec .score { font-size: 11px; font-weight: 700; color: var(--neon-ink); background: var(--neon-soft); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+  .recs .rec .a { white-space: pre-wrap; line-height: 1.4; max-height: 7.2em; overflow: hidden; }
+  .recs .rec.open .a { max-height: none; }
+  .recs .rec .meta { font-size: 11px; color: var(--muted); }
+  .recs .rec img { max-width: 100%; border-radius: 6px; }
+  .recs .btn.sm { background: transparent; color: var(--neon-ink); border: 1px solid var(--neon); }
+  .recs .btn.sm:hover { background: var(--neon-soft); }
+  .recs .muted { font-size: 12px; color: var(--muted); }
   .btn-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 
   .btn {
@@ -455,7 +477,7 @@ const fmt = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
 const fmtRp = (v) => 'Rp ' + fmt.format(Number(v || 0));
 const STATUS = { waiting_owner: 'Menunggu owner', owner_replied: 'Belum terkirim', resolved: 'Selesai', cancelled: 'Dibatalkan' };
 
-const state = { tickets: [], selected: null, filter: 'open', query: '', health: null, ordersLoaded: false };
+const state = { tickets: [], selected: null, filter: 'open', query: '', health: null, ordersLoaded: false, recs: {} };
 let chartMonth = null;
 let chartCompare = null;
 
@@ -583,7 +605,9 @@ function renderDetail(t, opts = {}) {
   const notConfigured = state.health && !state.health.owner_endpoint_configured;
 
   let chat = '<div class="sys">Tiket #' + esc(t.code) + ' dibuat ' + esc(fmtDate(t.created_at)) + '</div>' +
-    '<div class="bubble in"><div class="label">' + esc(t.customer_name) + '</div>' + esc(t.question) + '<div class="stamp">' + esc(fmtDate(t.created_at)) + '</div></div>';
+    customerMessages(t.question).map((m, i, all) =>
+      '<div class="bubble in' + (i ? ' cont' : '') + '">' + (i ? '' : '<div class="label">' + esc(t.customer_name) + '</div>') + esc(m) +
+      (i === all.length - 1 ? '<div class="stamp">' + esc(fmtDate(t.created_at)) + '</div>' : '') + '</div>').join('');
   if (t.owner_answer) {
     chat += '<div class="bubble out"><div class="label">Owner</div>' + esc(t.owner_answer) + '<div class="stamp">' + esc(fmtDate(t.owner_replied_at)) + (t.status === 'resolved' ? ' ✓' : '') + '</div></div>';
     if (t.status === 'owner_replied') chat += '<div class="sys" style="color:var(--red)">Jawaban belum terkirim ke pelanggan. Kirim ulang di bawah.</div>';
@@ -617,6 +641,7 @@ function renderDetail(t, opts = {}) {
         '<div><h3>Ringkasan untuk owner</h3>' +
           '<textarea id="summaryBox" placeholder="Ringkasan kebutuhan pelanggan…">' + esc(summaryDraft ?? t.needs_summary ?? '') + '</textarea>' +
           '<div class="btn-row"><button class="btn ghost sm" id="aiBtn">Ringkas dengan AI</button><button class="btn ghost sm" id="saveSumBtn">Simpan</button></div></div>' +
+        '<div class="recs" id="recsBox"><h3><span class="dot"></span>Rekomendasi knowledge</h3><div id="recsList" class="muted">Mencari knowledge terdekat…</div></div>' +
         (t.owner_question ? '<div><h3>Pertanyaan bot ke owner</h3><div style="font-size:13px;white-space:pre-wrap">' + esc(t.owner_question) + '</div></div>' : '') +
         '<div><h3>Detail</h3><dl>' +
           '<dt>Kode</dt><dd>#' + esc(t.code) + '</dd>' +
@@ -639,8 +664,61 @@ function renderDetail(t, opts = {}) {
   }
   const resendBtn = $('#resendBtn');
   if (resendBtn) resendBtn.addEventListener('click', () => resend(t));
+  $('#recsBox').addEventListener('click', (e) => {
+    const use = e.target.closest('[data-use]');
+    if (use) {
+      const box = $('#replyBox');
+      const hit = (state.recs[t.ticket_id]?.results || [])[Number(use.dataset.use)];
+      if (box && hit) { box.value = (box.value.trim() ? box.value.trim() + '\n\n' : '') + hit.answer; box.focus(); }
+      return;
+    }
+    const edit = e.target.closest('[data-edit]');
+    if (edit) {
+      const pid = edit.dataset.edit;
+      (kb.loaded ? Promise.resolve() : loadKnowledge()).then(() => { switchView('knowledge'); kbOpenEditor(pid); });
+      return;
+    }
+    const rec = e.target.closest('.rec');
+    if (rec && !e.target.closest('button')) rec.classList.toggle('open');
+  });
+  loadRecs(t);
   const chatEl = $('#chat');
   chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+// Pesan pelanggan disimpan dalam satu kolom, tiap pesan baru ditambahkan dengan baris baru.
+// Pecah lagi per baris supaya tiap pesan tampil sebagai bubble sendiri.
+function customerMessages(text) {
+  const parts = String(text || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+  return parts.length ? parts : [''];
+}
+
+// 5 knowledge terdekat dari Qdrant untuk pesan pelanggan di tiket ini (disimpan per tiket
+// supaya refresh otomatis tidak memanggil embedding lagi kecuali pesan berubah).
+async function loadRecs(t) {
+  const q = customerMessages(t.question).slice(-6).join('\n').slice(-1500);
+  const key = t.ticket_id;
+  let cached = state.recs[key];
+  if (!cached || cached.q !== q) {
+    cached = state.recs[key] = { q, promise: post('api/knowledge/search', { q, limit: 5 }) };
+    cached.promise.then((r) => { cached.results = r.results; }, (err) => { cached.error = err.message; delete state.recs[key]; });
+  }
+  let r, error;
+  try { r = await cached.promise; } catch (err) { error = err.message; }
+  const el = $('#recsList');
+  if (!el || state.selected !== t.ticket_id) return;
+  if (error) { el.innerHTML = '<div class="alert err">' + esc(error) + '</div>'; return; }
+  const hits = (r.results || []).slice(0, 5);
+  if (!hits.length) { el.innerHTML = 'Belum ada knowledge yang cocok.'; return; }
+  el.className = '';
+  el.innerHTML = hits.map((h, i) => '<div class="rec" title="Klik untuk lihat lengkap"><div class="top"><div class="q">' +
+      esc(h.type === 'image_asset' ? (h.caption || h.asset_id) : h.question) + '</div><span class="score">' + Math.round(h.score * 100) + '%</span></div>' +
+      (h.type === 'image_asset' ? '<img loading="lazy" src="api/knowledge/image/' + encodeURIComponent(h.file) + '" alt="">' : '<div class="a">' + esc(h.answer) + '</div>') +
+      '<div class="meta">' + esc(KB_TYPE[h.type] || h.type) + (h.category ? ' · ' + esc(h.category.replace(/_/g, ' ')) : '') +
+        (h.used ? '' : ' · di bawah ambang bot') + (h.type !== 'image_asset' && !h.auto_reply ? ' · hanya untuk owner' : '') + '</div>' +
+      (h.type === 'image_asset' ? '' : '<div class="btn-row">' + ($('#replyBox') ? '<button class="btn sm" data-use="' + i + '">Pakai di balasan</button>' : '') +
+        '<button class="btn sm" data-edit="' + esc(h.point_id) + '">Edit</button></div>') +
+    '</div>').join('');
 }
 
 function showResult(kind, text) {
