@@ -147,17 +147,21 @@
   }
   .side .recs h3 { color: var(--neon-ink); display: flex; align-items: center; gap: 6px; }
   .recs h3 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--neon); box-shadow: 0 0 8px var(--neon); }
-  .recs .rec { border: 1px solid rgba(176,38,255,0.35); border-radius: 9px; padding: 8px 10px; background: #fff; display: grid; gap: 4px; font-size: 12.5px; }
+  .recs .rec { border: 1px solid #9d1cf0; border-radius: 9px; padding: 9px 11px; background: #8a17d9; color: #fff; display: grid; gap: 4px; font-size: 12.5px; cursor: pointer;
+    box-shadow: 0 0 10px rgba(176,38,255,0.45); }
   .recs .rec + .rec { margin-top: 8px; }
   .recs .rec .top { display: flex; gap: 6px; align-items: baseline; }
   .recs .rec .q { font-weight: 700; flex: 1; min-width: 0; }
-  .recs .rec .score { font-size: 11px; font-weight: 700; color: var(--neon-ink); background: var(--neon-soft); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+  .recs .rec .score { font-size: 11px; font-weight: 700; color: #6b00b8; background: #fff; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
   .recs .rec .a { white-space: pre-wrap; line-height: 1.4; max-height: 7.2em; overflow: hidden; }
   .recs .rec.open .a { max-height: none; }
-  .recs .rec .meta { font-size: 11px; color: var(--muted); }
+  .recs .rec .meta { font-size: 11px; color: rgba(255,255,255,0.75); }
   .recs .rec img { max-width: 100%; border-radius: 6px; }
-  .recs .btn.sm { background: transparent; color: var(--neon-ink); border: 1px solid var(--neon); }
-  .recs .btn.sm:hover { background: var(--neon-soft); }
+  .recs .btn.sm { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.8); }
+  .recs .btn.sm:hover { background: rgba(255,255,255,0.15); }
+  .recs .btn.sm.send { background: #fff; color: #6b00b8; border-color: #fff; font-weight: 700; }
+  .recs .btn.sm.send:hover { background: #f1e2ff; }
+  .recs .btn.sm:disabled { opacity: .6; cursor: default; }
   .recs .muted { font-size: 12px; color: var(--muted); }
   .btn-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 
@@ -641,7 +645,7 @@ function renderDetail(t, opts = {}) {
         '<div><h3>Ringkasan untuk owner</h3>' +
           '<textarea id="summaryBox" placeholder="Ringkasan kebutuhan pelanggan…">' + esc(summaryDraft ?? t.needs_summary ?? '') + '</textarea>' +
           '<div class="btn-row"><button class="btn ghost sm" id="aiBtn">Ringkas dengan AI</button><button class="btn ghost sm" id="saveSumBtn">Simpan</button></div></div>' +
-        '<div class="recs" id="recsBox"><h3><span class="dot"></span>Rekomendasi knowledge</h3><div id="recsList" class="muted">Mencari knowledge terdekat…</div></div>' +
+        '<div class="recs" id="recsBox"><h3><span class="dot"></span>Knowledge</h3><div id="recsList" class="muted">Mencari knowledge terdekat…</div></div>' +
         (t.owner_question ? '<div><h3>Pertanyaan bot ke owner</h3><div style="font-size:13px;white-space:pre-wrap">' + esc(t.owner_question) + '</div></div>' : '') +
         '<div><h3>Detail</h3><dl>' +
           '<dt>Kode</dt><dd>#' + esc(t.code) + '</dd>' +
@@ -665,6 +669,17 @@ function renderDetail(t, opts = {}) {
   const resendBtn = $('#resendBtn');
   if (resendBtn) resendBtn.addEventListener('click', () => resend(t));
   $('#recsBox').addEventListener('click', (e) => {
+    const send = e.target.closest('[data-send]');
+    if (send) {
+      const hit = (state.recs[t.ticket_id]?.results || [])[Number(send.dataset.send)];
+      const box = $('#replyBox');
+      if (!hit || !box || !$('#sendBtn')) return;
+      if (!confirm('Kirim jawaban knowledge ini ke ' + t.customer_phone + ' lewat WhatsApp?\n\n' + hit.answer)) return;
+      box.value = hit.answer;
+      send.disabled = true;
+      sendReply(t).finally(() => { send.disabled = false; });
+      return;
+    }
     const use = e.target.closest('[data-use]');
     if (use) {
       const box = $('#replyBox');
@@ -716,7 +731,7 @@ async function loadRecs(t) {
       (h.type === 'image_asset' ? '<img loading="lazy" src="api/knowledge/image/' + encodeURIComponent(h.file) + '" alt="">' : '<div class="a">' + esc(h.answer) + '</div>') +
       '<div class="meta">' + esc(KB_TYPE[h.type] || h.type) + (h.category ? ' · ' + esc(h.category.replace(/_/g, ' ')) : '') +
         (h.used ? '' : ' · di bawah ambang bot') + (h.type !== 'image_asset' && !h.auto_reply ? ' · hanya untuk owner' : '') + '</div>' +
-      (h.type === 'image_asset' ? '' : '<div class="btn-row">' + ($('#replyBox') ? '<button class="btn sm" data-use="' + i + '">Pakai di balasan</button>' : '') +
+      (h.type === 'image_asset' ? '' : '<div class="btn-row">' + ($('#sendBtn') ? '<button class="btn sm send" data-send="' + i + '">Kirim</button>' : '') + ($('#replyBox') ? '<button class="btn sm" data-use="' + i + '" title="Salin ke kotak balasan untuk diedit dulu">Pakai</button>' : '') +
         '<button class="btn sm" data-edit="' + esc(h.point_id) + '">Edit</button></div>') +
     '</div>').join('');
 }
