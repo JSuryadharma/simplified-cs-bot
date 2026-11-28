@@ -28,18 +28,18 @@ node tests/split-reply.test.mjs
 Kode node ada di `workflows/snippets/pecah-balasan.js`; kalau file itu diubah, tempel ulang ke
 node "Pecah Balasan" di `workflows/wa-admin-lengkap.json` (atau di editor n8n).
 
-## Tes opsi knowledge
+## Tes opsi jawaban dari AI
 
-Setelah balasan otomatis, node **Siapkan Opsi Knowledge** menawarkan maks. 3 pertanyaan lain yang
-jawabannya ada di knowledge sebagai pesan interaktif WhatsApp (tombol bila pendek, kalau tidak
-list). Opsi yang diketuk pelanggan masuk dengan id `kb:<pertanyaan>` dan dijawab lewat alur RAG
-yang sama. Tes (tanpa n8n) juga mengecek bahwa alur lama tidak berubah:
+AI mengisi field `opsi` hanya bila pertanyaannya ke pelanggan punya beberapa pilihan jelas
+(mis. "Sudah ada desain" / "Butuh referensi", atau jenis produk dari Qdrant). Chat balasan terakhir
+lalu dikirim sebagai pesan interaktif WhatsApp (tombol / list); opsi yang diketuk masuk dengan id
+`opt:<opsi>|q:<pertanyaan>`. Tes (tanpa n8n), termasuk alur lama yang tidak berubah:
 
 ```bash
-node tests/knowledge-options.test.mjs
+node tests/reply-options.test.mjs
 ```
 
-Kode node ada di `workflows/snippets/opsi-knowledge.js` (tes gagal kalau isi node berbeda).
+Kode node "Siapkan Pesan Opsi" ada di `workflows/snippets/opsi-balasan.js` (tes gagal kalau isi node berbeda).
 
 ## Tes emoji
 

@@ -43,8 +43,8 @@ test('teks tetap untuk pelanggan tidak memakai emoji', () => {
   const texts = [...code('Parse Keputusan AI').matchAll(/reply = '([^']*)'|\+ ' ya[^']*'|' dan ' \+ daftar\[daftar\.length - 1\] \+ '([^']*)'/g)].map((m) => m[0]);
   assert.ok(texts.length >= 4);
   for (const t of texts) assert.ok(!EMOJI.test(t), `masih ada emoji: ${t}`);
-  const opsi = code('Siapkan Opsi Knowledge');
-  for (const t of opsi.match(/const bodyText = '[^']*'|footer: \{ text: '[^']*'/g)) assert.ok(!EMOJI.test(t), `masih ada emoji: ${t}`);
+  const opsi = code('Siapkan Pesan Opsi');
+  for (const t of opsi.match(/button: '[^']*'|title: '[^']*'/g)) assert.ok(!EMOJI.test(t), `masih ada emoji: ${t}`);
 });
 
 let failed = 0;
