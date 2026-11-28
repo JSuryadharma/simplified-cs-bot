@@ -48,3 +48,11 @@ Emoji 🤗 tidak pernah dikirim ke pelanggan (dibuang di node *Parse Keputusan A
 ```bash
 node tests/emoji.test.mjs
 ```
+
+## Tes eskalasi
+
+Eskalasi hanya membuka tiket di dashboard, tanpa pesan WhatsApp ke owner:
+
+```bash
+node tests/escalation.test.mjs
+```

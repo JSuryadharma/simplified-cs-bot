@@ -164,7 +164,7 @@ test('wiring: alur lama tetap, chat terakhir dengan opsi lewat pesan interaktif,
   assert.deepEqual(targets('Cari Knowledge Qdrant'), ['Daftar Produk Knowledge']);
   assert.deepEqual(targets('Daftar Produk Knowledge'), ['Siapkan Keputusan AI']);
   assert.deepEqual(targets('Balas Otomatis?', 0), ['Pecah Balasan']);
-  assert.deepEqual(targets('Balas Otomatis?', 1), ['Eskalasi ke Owner']);
+  assert.deepEqual(targets('Balas Otomatis?', 1), ['Tiket di Dashboard']);
   assert.deepEqual(targets('Pecah Balasan'), ['Loop Chat Balasan']);
   assert.deepEqual(targets('Loop Chat Balasan', 0), ['Balasan Terkirim Semua']);
   assert.deepEqual(targets('Loop Chat Balasan', 1), ['Chat dengan Opsi?']);
