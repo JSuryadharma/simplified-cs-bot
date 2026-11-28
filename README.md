@@ -125,7 +125,7 @@ Prasyarat: Docker Desktop, Node.js 20+, dan API key OpenRouter.
    (cd ../GitHub/savior-app && docker compose up -d)
    make db-init  # sekali untuk database SaViOr baru
    make up
-   make import   # opsional: timpa workflow dengan workflows/wa-admin-lengkap.json
+   make import   # opsional: timpa workflow dengan workflows/wa-admin-lengkap.json (otomatis backup dulu ke backups/workflows_<waktu>/)
    ```
 
 4. Buka `http://localhost:5678`, buat akun owner, lalu isi credential
