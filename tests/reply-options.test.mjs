@@ -84,7 +84,7 @@ test('produk_tersedia diambil dari Qdrant, urut terbanyak, tanpa nama bahan', ()
 
 test('opsi yang diketuk diteruskan ke AI sebagai menjawab_opsi', () => {
   const { payload } = siapkan({ points: [], normalisasi: { text: 'Butuh referensi desain', answering_question: 'sudah ada desain yang diinginkan?' } });
-  assert.deepEqual(payload.menjawab_opsi, { pertanyaan: 'sudah ada desain yang diinginkan?', pilihan: 'Butuh referensi desain' });
+  assert.deepEqual(payload.menjawab_opsi, { pertanyaan: 'sudah ada desain yang diinginkan?', pilihan: 'Butuh referensi desain', konteks: '' });
 });
 
 test('Parse: opsi dari AI dibersihkan (nomor, emoji, duplikat) dan daftar opsi di reply dibuang', () => {
@@ -189,6 +189,65 @@ test('kirim opsi lewat nomor bisnis, gagal kirim tidak menggagalkan eksekusi', (
   assert.equal(send.onError, 'continueRegularOutput');
   assert.equal(send.parameters.options.response.response.neverError, true);
   assert.match(node('Chat dengan Opsi?').parameters.conditions.conditions[0].leftValue, /reply_part === \$json\.reply_parts/);
+});
+
+
+// ---- Alur referensi desain: jenis -> model -> warna -> "Ini kita ada bentukan design yang mirip" + gambar
+const ASSET = { content_type: 'image_asset', asset_id: 'kaos-vneck-tosca', asset_path: '/home/node/.n8n/storage/kaos.jpg', mime_type: 'image/jpeg', asset_kind: 'foto', asset_detail: 'contoh_desain', produk: 'kaos', question: '', answer: '' };
+
+test('prompt: alur referensi tanya model, lalu warna, lalu kirim desain yang mirip; schema konteks_order', () => {
+  const { system, body } = siapkan({ points: [] });
+  assert.match(system, /Mau model yang seperti apa kak\?/);
+  assert.match(system, /Warnanya mau apa kak\?/);
+  assert.match(system, /Ini kita ada bentukan design yang mirip/);
+  assert.match(system, /konteks_order/);
+  const schema = body.response_format.json_schema.schema;
+  assert.deepEqual(schema.properties.konteks_order, { type: 'string' });
+  assert.ok(schema.required.includes('konteks_order'));
+});
+
+test('konteks order ikut di id opsi, dibaca Normalisasi, dan diteruskan ke AI', () => {
+  const prep = new Function('$', '$input', snippet)(
+    stub({ 'Parse Keputusan AI': { options: ['Oblong', 'V-neck', 'Berkerah'], konteks_order: 'butuh referensi; produk: kaos' } }),
+    { first: () => ({ json: { customer_phone: '6281200000001', reply: 'Siap kak.. mau model yang seperti apa kak?' } }) }
+  )[0].json;
+  const btn = prep.whatsapp_payload.interactive.action.buttons[1].reply;
+  assert.equal(btn.id, 'opt:V-neck|q:mau model yang seperti apa kak?|c:butuh referensi; produk: kaos');
+  const [m] = normalize({ from: '6281200000001', id: 'wamid.9', type: 'interactive', interactive: { type: 'button_reply', button_reply: btn } });
+  assert.equal(m.text, 'V-neck');
+  assert.equal(m.answering_question, 'mau model yang seperti apa kak?');
+  assert.equal(m.answering_context, 'butuh referensi; produk: kaos');
+  const { payload } = siapkan({ points: [], normalisasi: m });
+  assert.deepEqual(payload.menjawab_opsi, { pertanyaan: 'mau model yang seperti apa kak?', pilihan: 'V-neck', konteks: 'butuh referensi; produk: kaos' });
+  assert.match(node('Embedding Pertanyaan').parameters.jsonBody, /answering_context/);
+});
+
+test('id opsi tetap maks 200 karakter walau pertanyaan dan konteks panjang', () => {
+  const r = new Function('$', '$input', snippet)(
+    stub({ 'Parse Keputusan AI': { options: ['Kombinasi batik dengan list di lengan dan kerah', 'Polos'], konteks_order: 'x'.repeat(90) } }),
+    { first: () => ({ json: { customer_phone: '1', reply: 'Baik kak, ' + 'y'.repeat(150) + ' mau model yang seperti apa?' } }) }
+  )[0].json;
+  for (const row of r.whatsapp_payload.interactive.action.sections[0].rows) assert.ok(row.id.length <= 200, row.id.length);
+});
+
+test('Parse: jawaban opsi alur order tidak dipaksa eskalasi walau knowledge kosong', () => {
+  const mo = { pertanyaan: 'sudah ada desain yang diinginkan?', pilihan: 'Butuh referensi', konteks: '' };
+  const r = parse({ reply: 'Siap kak.. kalau boleh tau kakak mau order jenis apa?', opsi: ['Kaos', 'Jaket', 'Polo'], konteks_order: 'butuh referensi' }, { message: 'Butuh referensi', prep: { knowledge: [], menjawabOpsi: mo } });
+  assert.equal(r.action, 'AUTO_REPLY');
+  assert.deepEqual(r.options, ['Kaos', 'Jaket', 'Polo']);
+  assert.equal(r.konteks_order, 'butuh referensi');
+  // tanpa menjawab_opsi dan tanpa knowledge tetap eskalasi (aturan lama)
+  assert.equal(parse({ reply: 'Siap kak..', opsi: [] }, { message: 'Butuh referensi', prep: { knowledge: [] } }).action, 'ESCALATE');
+});
+
+test('Parse: di akhir alur referensi gambar desain yang mirip ikut dikirim', () => {
+  const mo = { pertanyaan: 'warnanya mau apa kak?', pilihan: 'Tosca', konteks: 'butuh referensi; produk: kaos; model: V-neck' };
+  const r = parse({ reply: 'Ini kita ada bentukan design yang mirip ya kak', asset_id: 'kaos-vneck-tosca', konteks_order: 'butuh referensi; produk: kaos; model: V-neck; warna: tosca' }, { message: 'Tosca', prep: { knowledge: [ASSET], menjawabOpsi: mo } });
+  assert.equal(r.action, 'AUTO_REPLY');
+  assert.equal(r.selected_asset?.asset_id, 'kaos-vneck-tosca');
+  assert.deepEqual(r.options, []);
+  // tanpa alur opsi, pesan "Tosca" saja tidak memicu kirim gambar (aturan lama)
+  assert.equal(parse({ reply: 'Baik kak', asset_id: 'kaos-vneck-tosca' }, { message: 'Tosca', prep: { knowledge: [ASSET] } }).selected_asset, null);
 });
 
 let failed = 0;
