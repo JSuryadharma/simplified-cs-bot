@@ -85,7 +85,7 @@ flowchart LR
     Q --> LLM[OpenRouter chat model]
     DB --> LLM
     LLM -->|knowledge/order cukup| AUTO[Balas pelanggan]
-    LLM -->|tidak cukup| ESC[Eskalasi ke owner]
+    LLM -->|tidak cukup| ESC[Buka tiket di dashboard]
     ESC --> WAIT[Status waiting_owner]
     WAIT -->|pesan pelanggan tambahan| SILENT[Catat, jangan balas]
     DASH[Dashboard tiket] -->|POST owner/command| DIRECT[Teruskan jawaban owner]
@@ -246,7 +246,7 @@ endpoint terpisah yang dipanggil server dashboard:
 
 Respons: `200` berhasil, `400` payload salah, `401` secret salah, `409` tiket tidak
 ditemukan/sudah selesai, `502` WhatsApp menolak pesan (tiket tetap terbuka).
-Isi `DASHBOARD_PUBLIC_URL` agar pesan eskalasi ke owner memuat link dashboard.
+Eskalasi tidak dikirim ke WhatsApp owner; tiket baru hanya muncul di dashboard tiket.
 
 Selama tiket berstatus `waiting_owner` atau `owner_replied`, setiap pesan tambahan
 pelanggan hanya disimpan. Tidak ada pesan tunggu otomatis yang dikirim.
