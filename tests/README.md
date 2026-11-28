@@ -40,3 +40,11 @@ node tests/knowledge-options.test.mjs
 ```
 
 Kode node ada di `workflows/snippets/opsi-knowledge.js` (tes gagal kalau isi node berbeda).
+
+## Tes emoji
+
+Emoji 🤗 tidak pernah dikirim ke pelanggan (dibuang di node *Parse Keputusan AI*), dan teks tetap bot tanpa emoji:
+
+```bash
+node tests/emoji.test.mjs
+```
