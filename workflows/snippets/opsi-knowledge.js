@@ -89,7 +89,7 @@ if (!skipReason) {
 if (skipReason) return [{ json: { send_options: false, skip_reason: skipReason, customer_phone: phone } }];
 
 const id = (q) => (OPTION_PREFIX + q).slice(0, 200);
-const bodyText = 'Mungkin kakak juga mau tahu ini 👇';
+const bodyText = 'Mungkin kakak juga mau tahu ini:';
 const useButtons = options.length <= 3 && options.every((q) => q.length <= 20);
 const interactive = useButtons
   ? {
@@ -100,7 +100,7 @@ const interactive = useButtons
   : {
       type: 'list',
       body: { text: bodyText },
-      footer: { text: 'Ketuk salah satu, nanti kami jawab 🙏' },
+      footer: { text: 'Ketuk salah satu, nanti kami jawab' },
       action: {
         button: 'Lihat pertanyaan',
         sections: [{
