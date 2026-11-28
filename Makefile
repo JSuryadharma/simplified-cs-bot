@@ -1,4 +1,4 @@
-.PHONY: validate config up down restart ps logs import export-workflow doctor db-migrate db-init backup fix-perms
+.PHONY: validate config up down restart ps logs import backup-workflow export-workflow doctor db-migrate db-init backup fix-perms
 
 COMPOSE = docker compose --env-file .env
 # ID workflow di n8n (server: simplified-cs). Override: make export-workflow WORKFLOW_ID=...
@@ -34,8 +34,19 @@ ps:
 logs:
 	$(COMPOSE) logs -f --tail=100
 
-# Impor + publish ulang workflow gabungan ke n8n, lalu restart agar aktif
-import:
+# Backup semua workflow yang ada di n8n (termasuk edit dari UI) ke backups/workflows_<waktu>/,
+# satu file JSON per workflow. Hanya membaca n8n; backups/ tidak ikut ke git.
+# Pulihkan: docker compose cp <file> n8n:/tmp/restore.json && docker compose exec n8n n8n import:workflow --input=/tmp/restore.json
+backup-workflow:
+	mkdir -p backups
+	@ts=$$(date +%Y%m%d_%H%M%S); \
+	$(COMPOSE) exec -T n8n n8n export:workflow --backup --output=/tmp/wf-backup-$$ts/ && \
+	$(COMPOSE) cp n8n:/tmp/wf-backup-$$ts backups/workflows_$$ts && \
+	ls -l backups/workflows_$$ts && echo "Backup workflow: backups/workflows_$$ts"
+
+# Impor + publish ulang workflow gabungan ke n8n, lalu restart agar aktif.
+# Selalu backup workflow yang sedang jalan dulu (backup-workflow); impor batal kalau backup gagal.
+import: backup-workflow
 	$(COMPOSE) exec n8n n8n import:workflow --input=/$(WORKFLOW_FILE)
 	$(COMPOSE) exec n8n n8n publish:workflow --id=$(WORKFLOW_ID)
 	$(COMPOSE) restart n8n
