@@ -4,13 +4,17 @@
 // Sumber kode untuk node Code "Siapkan Pesan Opsi" di workflows/wa-admin-lengkap.json
 // (tempel ulang ke node itu kalau file ini diubah; tes: node tests/reply-options.test.mjs).
 //
-// Id tiap opsi: "opt:<opsi>|q:<pertanyaan bot>". Saat pelanggan mengetuknya, node
-// "Normalisasi dan Verifikasi" memakai <opsi> sebagai teks pesan dan <pertanyaan bot> sebagai
-// answering_question, supaya AI tahu pilihan itu menjawab pertanyaan apa (chat history kosong).
+// Id tiap opsi: "opt:<opsi>|q:<pertanyaan bot>|c:<konteks order>" (maks 200 karakter). Saat
+// pelanggan mengetuknya, node "Normalisasi dan Verifikasi" memakai <opsi> sebagai teks pesan,
+// <pertanyaan bot> sebagai answering_question, dan <konteks order> (mis. "butuh referensi;
+// produk: kaos") sebagai answering_context, supaya AI tahu langkah order sebelumnya
+// (chat history kosong).
 // fallback_reply = teks + daftar opsi bernomor, dipakai bila pesan interaktif gagal terkirim.
 
 const base = $input.first().json;
-const options = ($('Parse Keputusan AI').first().json.options || []).map((o) => String(o)).filter(Boolean).slice(0, 10);
+const decision = $('Parse Keputusan AI').first().json;
+const options = (decision.options || []).map((o) => String(o)).filter(Boolean).slice(0, 10);
+const konteks = String(decision.konteks_order || '').replace(/[|\n]/g, ' ').trim();
 const reply = String(base.reply || '').trim();
 const phone = String(base.customer_phone || '').replace(/\D/g, '');
 
@@ -23,8 +27,8 @@ const cut = (s, max) => {
 };
 // Pertanyaan bot = kalimat terakhir yang diakhiri "?" (atau seluruh balasan, dipotong)
 const questions = reply.match(/[^.!?\n]*\?/g) || [];
-const question = cut(questions.length ? questions[questions.length - 1] : reply, 110);
-const id = (o) => ('opt:' + cut(o, 72) + '|q:' + question).slice(0, 200);
+const question = cut(questions.length ? questions[questions.length - 1] : reply, 70).replace(/\|/g, ' ');
+const id = (o) => ('opt:' + cut(o, 40).replace(/\|/g, ' ') + '|q:' + question + (konteks ? '|c:' + konteks : '')).slice(0, 200);
 const fallbackReply = reply + '\n\n' + options.map((o, i) => (i + 1) + '. ' + o).join('\n');
 
 const useButtons = options.length <= 3 && options.every((o) => o.length <= 20) && reply.length <= 1024;
@@ -51,6 +55,7 @@ return [{ json: {
   customer_phone: phone,
   options,
   question,
+  konteks,
   fallback_reply: fallbackReply,
   whatsapp_payload: { messaging_product: 'whatsapp', recipient_type: 'individual', to: phone, type: 'interactive', interactive }
 } }];
